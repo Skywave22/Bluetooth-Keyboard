@@ -1,0 +1,59 @@
+package com.bluepilot.remote.model
+
+/**
+ * User settings models.
+ *
+ * Every numeric field has a defined valid range and a `sanitized()` function —
+ * values coming from storage or UI are ALWAYS clamped before use, so an
+ * out-of-range value can never break rendering or HID math.
+ */
+
+enum class ThemeMode { LIGHT, DARK, SYSTEM }
+
+/** General app behavior. */
+data class AppSettings(
+    val theme: ThemeMode = ThemeMode.SYSTEM,
+    val fullscreenMode: Boolean = false,
+    val keepScreenOn: Boolean = true,
+    val touchVibrations: Boolean = true,
+    val secureScreen: Boolean = false
+)
+
+/** Mouse/trackpad tuning. All percentages 0..100. */
+data class MouseSettings(
+    val sensitivity: Int = 65,
+    val scrollSpeed: Int = 50,
+    val movementSmoothing: Int = 20,
+    val invertScroll: Boolean = false,
+    val tapToClick: Boolean = true,
+    val penMode: Boolean = false
+) {
+    companion object { const val MIN = 0; const val MAX = 100 }
+
+    /** Clamp every numeric field into its valid range. */
+    fun sanitized(): MouseSettings = copy(
+        sensitivity = sensitivity.coerceIn(MIN, MAX),
+        scrollSpeed = scrollSpeed.coerceIn(MIN, MAX),
+        movementSmoothing = movementSmoothing.coerceIn(MIN, MAX)
+    )
+}
+
+/** Keyboard screen behavior. */
+data class KeyboardSettings(
+    val showTextInputBar: Boolean = true
+)
+
+/** Gamepad behavior. Percentages 0..100; dead zone capped at 50 (usability). */
+data class GamepadSettings(
+    val mappingMode: GamepadMappingMode = GamepadMappingMode.HID_GAMEPAD,
+    val joystickSensitivity: Int = 70,
+    val deadZone: Int = 10,
+    val hapticFeedback: Boolean = true
+) {
+    companion object { const val DEAD_ZONE_MAX = 50 }
+
+    fun sanitized(): GamepadSettings = copy(
+        joystickSensitivity = joystickSensitivity.coerceIn(0, 100),
+        deadZone = deadZone.coerceIn(0, DEAD_ZONE_MAX)
+    )
+}
