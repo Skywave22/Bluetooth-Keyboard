@@ -4,7 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,15 +17,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import kotlin.math.max
 
 /**
- * SECTION 1 — Theme engine.
+ * Theme engine (Section 1, upgraded for the "implement all designs" pass).
  *
  * [LocalAppTheme] carries the active [AppThemeSpec] to every composable.
- * [BluePilotAppTheme] bridges the spec into a Material3 ColorScheme so all
- * existing M3 components re-skin automatically — every current screen keeps
- * working untouched, and theme changes propagate instantly app-wide.
+ * [BluePilotAppTheme] bridges the spec into Material3 so ALL existing
+ * screens re-skin automatically. The glass look is applied globally:
+ *
+ *  - surface / surfaceVariant get the spec's [AppThemeSpec.surfaceAlpha]
+ *    baked into the M3 color scheme -> every Card/sheet becomes a frosted
+ *    translucent panel and the background orbs glow through, exactly like
+ *    the designs/glass-*, lgm-*, hi-* mockups.
+ *  - MaterialTheme.shapes are generated from [AppThemeSpec.cornerRadius]
+ *    -> HUD themes get tight 8dp instrument corners while glass themes get
+ *    soft 24-28dp pills, app-wide, with zero per-screen code.
  */
 val LocalAppTheme = staticCompositionLocalOf { BuiltInThemes.PILOT_DARK }
 
@@ -32,6 +42,10 @@ fun BluePilotAppTheme(
     spec: AppThemeSpec,
     content: @Composable () -> Unit
 ) {
+    // Glass materials: translucent surfaces let the themed orbs shine through.
+    val glassSurface = spec.surface.copy(alpha = spec.surfaceAlpha)
+    val glassVariant = spec.surfaceVariant.copy(alpha = spec.surfaceAlpha)
+
     val scheme = if (spec.isDark) {
         darkColorScheme(
             primary = spec.primary, onPrimary = spec.onPrimary,
@@ -39,8 +53,8 @@ fun BluePilotAppTheme(
             onPrimaryContainer = spec.onPrimary,
             secondary = spec.secondary, onSecondary = spec.onPrimary,
             background = spec.background, onBackground = spec.onBackground,
-            surface = spec.surface, onSurface = spec.onSurface,
-            surfaceVariant = spec.surfaceVariant, onSurfaceVariant = spec.onSurfaceVariant,
+            surface = glassSurface, onSurface = spec.onSurface,
+            surfaceVariant = glassVariant, onSurfaceVariant = spec.onSurfaceVariant,
             outline = spec.outline,
             error = spec.error, onError = spec.onPrimary,
             errorContainer = spec.error.copy(alpha = 0.25f), onErrorContainer = spec.onBackground
@@ -52,21 +66,32 @@ fun BluePilotAppTheme(
             onPrimaryContainer = spec.primary,
             secondary = spec.secondary, onSecondary = spec.onPrimary,
             background = spec.background, onBackground = spec.onBackground,
-            surface = spec.surface, onSurface = spec.onSurface,
-            surfaceVariant = spec.surfaceVariant, onSurfaceVariant = spec.onSurfaceVariant,
+            surface = glassSurface, onSurface = spec.onSurface,
+            surfaceVariant = glassVariant, onSurfaceVariant = spec.onSurfaceVariant,
             outline = spec.outline,
             error = spec.error, onError = spec.onPrimary,
             errorContainer = spec.error.copy(alpha = 0.15f), onErrorContainer = spec.error
         )
     }
 
-    // Cockpit HUD theme flips the type ramp to monospace.
+    // Themed shape scale: small/medium/large derived from the spec radius.
+    val r = spec.cornerRadius
+    val shapes = Shapes(
+        extraSmall = RoundedCornerShape((r / 3).coerceAtLeast(2).dp),
+        small = RoundedCornerShape((r / 2).coerceAtLeast(4).dp),
+        medium = RoundedCornerShape(r.dp),
+        large = RoundedCornerShape((r + r / 3).dp),
+        extraLarge = RoundedCornerShape((r * 2).coerceAtMost(56).dp)
+    )
+
+    // Cockpit HUD themes flip the type ramp to monospace.
     val typography = if (spec.monoFont) monoTypography() else BluePilotTypography
 
     CompositionLocalProvider(LocalAppTheme provides spec) {
         MaterialTheme(
             colorScheme = scheme,
             typography = typography,
+            shapes = shapes,
             content = content
         )
     }
@@ -84,8 +109,7 @@ private fun monoTypography(): Typography {
 
 /**
  * Themed background: solid color plus the theme's blurred gradient orbs
- * (the liquid-glass aurora / tropical lagoon look). Pure Canvas — cheap to
- * draw, no bitmap allocations, no real-time blur cost.
+ * (aurora / lagoon / neon looks). Pure Canvas — no bitmaps, no blur cost.
  */
 @Composable
 fun ThemedBackground(

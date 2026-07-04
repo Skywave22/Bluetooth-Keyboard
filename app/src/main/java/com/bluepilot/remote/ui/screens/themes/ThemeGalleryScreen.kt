@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import com.bluepilot.remote.ui.theme.AppThemeSpec
 import com.bluepilot.remote.ui.theme.BuiltInThemes
 import com.bluepilot.remote.viewmodel.SettingsViewModel
@@ -80,6 +81,16 @@ fun ThemeGalleryScreen(
             )
         }
     ) { padding ->
+        // Gallery grouped by design family (one section per mockup set).
+        val families: List<Pair<String, List<AppThemeSpec>>> = listOf(
+            "Classic" to listOf(BuiltInThemes.PILOT_DARK, BuiltInThemes.PILOT_GLOW),
+            "Liquid Glass" to listOf(BuiltInThemes.LIQUID_GLASS, BuiltInThemes.LIQUID_GLASS_LIGHT),
+            "Glass × Material You" to listOf(BuiltInThemes.GLASS_YOU_DARK, BuiltInThemes.GLASS_YOU_LIGHT),
+            "Hawaii Harmony" to listOf(BuiltInThemes.HAWAII_NIGHT, BuiltInThemes.HAWAII_DAY),
+            "Cockpit HUD" to listOf(BuiltInThemes.COCKPIT_HUD, BuiltInThemes.DAY_FLIGHT),
+            "More" to listOf(BuiltInThemes.DARK_NEON, BuiltInThemes.OLED_BLACK, BuiltInThemes.MINIMAL_LIGHT)
+        )
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
@@ -89,12 +100,22 @@ fun ThemeGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(BuiltInThemes.ALL, key = { it.id }) { spec ->
-                ThemeCard(
-                    spec = spec,
-                    isActive = spec.id == app.themeId,
-                    onApply = { viewModel.setThemeId(spec.id) }
-                )
+            families.forEach { (family, specs) ->
+                item(key = "header-" + family, span = { GridItemSpan(2) }) {
+                    Text(
+                        text = family,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+                items(specs, key = { it.id }) { spec ->
+                    ThemeCard(
+                        spec = spec,
+                        isActive = spec.id == app.themeId,
+                        onApply = { viewModel.setThemeId(spec.id) }
+                    )
+                }
             }
         }
     }

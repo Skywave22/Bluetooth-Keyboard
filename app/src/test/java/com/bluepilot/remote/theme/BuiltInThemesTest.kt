@@ -13,8 +13,8 @@ import org.junit.Test
 class BuiltInThemesTest {
 
     @Test
-    fun `catalog has at least six themes`() {
-        assertTrue(BuiltInThemes.ALL.size >= 6)
+    fun `catalog has all thirteen design themes`() {
+        assertTrue(BuiltInThemes.ALL.size >= 13)
     }
 
     @Test
@@ -60,8 +60,12 @@ class BuiltInThemesTest {
     fun `design themes are present`() {
         val ids = BuiltInThemes.ALL.map { it.id }
         assertTrue(ids.containsAll(listOf(
-            "liquid_glass", "hawaii_night", "hawaii_day",
-            "cockpit_hud", "dark_neon", "oled_black", "minimal_light"
+            "pilot_dark", "pilot_glow",
+            "liquid_glass", "liquid_glass_light",
+            "glass_you_dark", "glass_you_light",
+            "hawaii_night", "hawaii_day",
+            "cockpit_hud", "day_flight",
+            "dark_neon", "oled_black", "minimal_light"
         )))
     }
 }

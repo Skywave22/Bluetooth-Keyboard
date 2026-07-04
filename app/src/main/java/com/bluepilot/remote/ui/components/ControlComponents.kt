@@ -27,7 +27,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import com.bluepilot.remote.model.HapticIntensity
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 
 /**
  * Shared building blocks for control screens.
@@ -85,14 +87,26 @@ fun KeyCard(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 800f),
         label = "keyPressScale"
     )
+    // Liquid-glass edge light: themes with edgeGlow get a thin luminous rim
+    // on every key (designs/glass-*, hud-*, lgm-* signature detail).
+    val spec = LocalAppTheme.current
+    val edgeModifier = if (spec.edgeGlow) {
+        Modifier.border(
+            width = 1.dp,
+            color = (spec.glowColor ?: spec.onSurface).copy(alpha = 0.22f),
+            shape = MaterialTheme.shapes.medium
+        )
+    } else Modifier
 
     Card(
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
             .heightIn(min = height)
+            .then(edgeModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.foundation.LocalIndication.current,

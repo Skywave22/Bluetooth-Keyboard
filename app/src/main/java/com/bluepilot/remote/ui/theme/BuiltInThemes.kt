@@ -144,13 +144,131 @@ object BuiltInThemes {
         cornerRadius = 18, elevation = 1
     )
 
+
+    /** designs/01-08 "Modern Material Glow": Pilot Dark + neon glow accents. */
+    val PILOT_GLOW = AppThemeSpec(
+        id = "pilot_glow",
+        name = "Pilot Glow",
+        isDark = true,
+        primary = Color(0xFF2F6BFF), onPrimary = Color.White,
+        secondary = Color(0xFF29C5FF),
+        background = Color(0xFF0B0F1A), onBackground = Color(0xFFE6EAF5),
+        surface = Color(0xFF121828), onSurface = Color(0xFFE6EAF5),
+        surfaceVariant = Color(0xFF1A2238), onSurfaceVariant = Color(0xFFAAB4CE),
+        outline = Color(0xFF2C3A5C),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFF2F6BFF), 0.85f, 0.10f, 0.35f, 0.22f),
+            ThemeOrb(Color(0xFF29C5FF), 0.10f, 0.85f, 0.40f, 0.18f)
+        ),
+        cornerRadius = 16, surfaceAlpha = 0.94f, edgeGlow = true, elevation = 2,
+        glowColor = Color(0xFF2F6BFF)
+    )
+
+    /** designs/glass-* light: Frost Glass — milky panels over pastel sky. */
+    val LIQUID_GLASS_LIGHT = AppThemeSpec(
+        id = "liquid_glass_light",
+        name = "Frost Glass",
+        isDark = false,
+        primary = Color(0xFF2F6BFF), onPrimary = Color.White,
+        secondary = Color(0xFF29C5FF),
+        background = Color(0xFFF2F5FC), onBackground = Color(0xFF1A2745),
+        surface = Color(0xFFFFFFFF), onSurface = Color(0xFF1A2745),
+        surfaceVariant = Color(0xFFE7EDFA), onSurfaceVariant = Color(0xFF4A5878),
+        outline = Color(0xFFBFCDE8),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFF9DB8FF), 0.15f, 0.12f, 0.45f, 0.40f),
+            ThemeOrb(Color(0xFFC9A8FF), 0.88f, 0.40f, 0.38f, 0.32f),
+            ThemeOrb(Color(0xFF8FE3FF), 0.35f, 0.90f, 0.48f, 0.35f)
+        ),
+        cornerRadius = 24, surfaceAlpha = 0.78f, edgeGlow = true, elevation = 0
+    )
+
+    /** designs/lgm-* dark: Material You Glass — charcoal-indigo mesh. */
+    val GLASS_YOU_DARK = AppThemeSpec(
+        id = "glass_you_dark",
+        name = "You Glass Dark",
+        isDark = true,
+        primary = Color(0xFF9FC2FF), onPrimary = Color(0xFF0E2A55),
+        secondary = Color(0xFF6FE0D2),
+        background = Color(0xFF121420), onBackground = Color(0xFFE9EAF4),
+        surface = Color(0xFF1C1F30), onSurface = Color(0xFFE9EAF4),
+        surfaceVariant = Color(0xFF272B42), onSurfaceVariant = Color(0xFFB4B9D6),
+        outline = Color(0xFF434A6E),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFF5B6BD6), 0.20f, 0.15f, 0.45f, 0.30f),
+            ThemeOrb(Color(0xFF3EB9A9), 0.85f, 0.55f, 0.38f, 0.24f),
+            ThemeOrb(Color(0xFF8A64C9), 0.40f, 0.92f, 0.42f, 0.24f)
+        ),
+        cornerRadius = 28, surfaceAlpha = 0.80f, edgeGlow = true, elevation = 0
+    )
+
+    /** designs/lgm-* light: Material You Glass — cream-pastel mesh. */
+    val GLASS_YOU_LIGHT = AppThemeSpec(
+        id = "glass_you_light",
+        name = "You Glass Light",
+        isDark = false,
+        primary = Color(0xFF3B5BA9), onPrimary = Color.White,
+        secondary = Color(0xFF2E8C80),
+        background = Color(0xFFFBF8F2), onBackground = Color(0xFF23283D),
+        surface = Color(0xFFFFFFFF), onSurface = Color(0xFF23283D),
+        surfaceVariant = Color(0xFFEFEAF8), onSurfaceVariant = Color(0xFF565D7A),
+        outline = Color(0xFFCCC6E0),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFFB9C6F2), 0.18f, 0.14f, 0.45f, 0.45f),
+            ThemeOrb(Color(0xFFA8E3DA), 0.85f, 0.45f, 0.36f, 0.38f),
+            ThemeOrb(Color(0xFFE7C7F2), 0.45f, 0.90f, 0.45f, 0.38f)
+        ),
+        cornerRadius = 28, surfaceAlpha = 0.85f, edgeGlow = true, elevation = 0
+    )
+
+    /** designs/hud-* light: Day Flight — brushed aluminum, navy + amber. */
+    val DAY_FLIGHT = AppThemeSpec(
+        id = "day_flight",
+        name = "Day Flight",
+        isDark = false,
+        primary = Color(0xFF16305A), onPrimary = Color.White,
+        secondary = Color(0xFFE07B00),
+        background = Color(0xFFD8DCE2), onBackground = Color(0xFF16213A),
+        surface = Color(0xFFE9ECF1), onSurface = Color(0xFF16213A),
+        surfaceVariant = Color(0xFFC9CFD9), onSurfaceVariant = Color(0xFF44506B),
+        outline = Color(0xFF9AA5B8),
+        cornerRadius = 8, surfaceAlpha = 1f, edgeGlow = true, elevation = 1,
+        glowColor = Color(0xFFE07B00),
+        connected = Color(0xFF1E7B4F), connecting = Color(0xFFE07B00),
+        monoFont = true
+    )
+
     /** All themes, gallery order. */
     val ALL: List<AppThemeSpec> = listOf(
-        PILOT_DARK, LIQUID_GLASS, HAWAII_NIGHT, HAWAII_DAY,
-        COCKPIT_HUD, DARK_NEON, OLED_BLACK, MINIMAL_LIGHT
+        PILOT_DARK, PILOT_GLOW,
+        LIQUID_GLASS, LIQUID_GLASS_LIGHT,
+        GLASS_YOU_DARK, GLASS_YOU_LIGHT,
+        HAWAII_NIGHT, HAWAII_DAY,
+        COCKPIT_HUD, DAY_FLIGHT,
+        DARK_NEON, OLED_BLACK, MINIMAL_LIGHT
     )
 
     /** Safe lookup with default fallback. */
     fun byId(id: String?): AppThemeSpec =
         ALL.firstOrNull { it.id == id } ?: PILOT_DARK
+
+    /**
+     * Dark/light counterpart within the same design family, used when the
+     * user forces LIGHT or DARK mode while a theme of the other brightness
+     * is selected (Hawaii Night <-> Hawaii Day, Liquid Glass <-> Frost
+     * Glass, Cockpit HUD <-> Day Flight, ...).
+     */
+    fun counterpart(spec: AppThemeSpec): AppThemeSpec = when (spec.id) {
+        "pilot_dark", "pilot_glow", "oled_black", "dark_neon" -> MINIMAL_LIGHT
+        "liquid_glass" -> LIQUID_GLASS_LIGHT
+        "liquid_glass_light" -> LIQUID_GLASS
+        "glass_you_dark" -> GLASS_YOU_LIGHT
+        "glass_you_light" -> GLASS_YOU_DARK
+        "hawaii_night" -> HAWAII_DAY
+        "hawaii_day" -> HAWAII_NIGHT
+        "cockpit_hud" -> DAY_FLIGHT
+        "day_flight" -> COCKPIT_HUD
+        "minimal_light" -> PILOT_DARK
+        else -> if (spec.isDark) MINIMAL_LIGHT else PILOT_DARK
+    }
 }

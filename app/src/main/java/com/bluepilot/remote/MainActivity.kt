@@ -50,11 +50,10 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> systemDark
             }
-            val spec = when {
-                baseSpec.isDark == wantDark -> baseSpec
-                wantDark -> BuiltInThemes.PILOT_DARK
-                else -> BuiltInThemes.MINIMAL_LIGHT
-            }
+            // Family-aware fallback: forcing Light while Hawaii Night is
+            // active gives Hawaii Day (not a generic light theme), etc.
+            val spec = if (baseSpec.isDark == wantDark) baseSpec
+            else BuiltInThemes.counterpart(baseSpec)
 
             // Apply window-level settings as side effects, restoring on change.
             DisposableEffect(app.keepScreenOn, app.secureScreen, app.fullscreenMode) {
