@@ -1,7 +1,10 @@
 package com.bluepilot.remote.ui.screens.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,23 +57,25 @@ private data class HomeTile(
     val subtitle: String,
     val icon: ImageVector,
     val route: String?,          // null = not built yet (disabled)
-    val needsPermissions: Boolean = false
+    val needsPermissions: Boolean = false,
+    /** Gel icon color (designs/glass-01: every tile has its own vivid hue). */
+    val gel: Long = 0xFF2F6BFF
 )
 
 private val tiles = listOf(
-    HomeTile("Connect", "Pair with a PC or device", Icons.Rounded.Bluetooth, Routes.CONNECTION, needsPermissions = true),
-    HomeTile("Mouse", "Trackpad and buttons", Icons.Rounded.Mouse, Routes.MOUSE),
-    HomeTile("Keyboard", "Full PC keyboard", Icons.Rounded.Keyboard, Routes.KEYBOARD),
-    HomeTile("Numpad", "Numeric keypad", Icons.Rounded.Pin, Routes.NUMPAD),
-    HomeTile("Multimedia", "Media and volume", Icons.Rounded.MusicNote, Routes.MULTIMEDIA),
-    HomeTile("Presenter", "Slide control", Icons.Rounded.Slideshow, Routes.PRESENTER),
-    HomeTile("Gamepad", "Game controller", Icons.Rounded.Gamepad, Routes.GAMEPAD),
-    HomeTile("Layouts", "Custom control screens", Icons.Rounded.Dashboard, Routes.LAYOUTS),
-    HomeTile("Macros", "Record & play sequences", Icons.Rounded.Bolt, Routes.MACROS),
-    HomeTile("Themes", "Change the whole look", Icons.Rounded.Palette, Routes.THEMES),
-    HomeTile("Pad Builder", "Design your own gamepad", Icons.Rounded.SportsEsports, Routes.GAMEPAD_BUILDER),
-    HomeTile("Settings", "Tune everything", Icons.Rounded.Settings, Routes.SETTINGS),
-    HomeTile("Help", "Pairing & troubleshooting", Icons.AutoMirrored.Rounded.HelpOutline, Routes.HELP)
+    HomeTile("Connect", "Pair with a PC or device", Icons.Rounded.Bluetooth, Routes.CONNECTION, needsPermissions = true, gel = 0xFF2F6BFF),
+    HomeTile("Mouse", "Trackpad and buttons", Icons.Rounded.Mouse, Routes.MOUSE, gel = 0xFF3D8BFF),
+    HomeTile("Keyboard", "Full PC keyboard", Icons.Rounded.Keyboard, Routes.KEYBOARD, gel = 0xFF9B59F6),
+    HomeTile("Numpad", "Numeric keypad", Icons.Rounded.Pin, Routes.NUMPAD, gel = 0xFFFF8C42),
+    HomeTile("Multimedia", "Media and volume", Icons.Rounded.MusicNote, Routes.MULTIMEDIA, gel = 0xFF17C3CE),
+    HomeTile("Presenter", "Slide control", Icons.Rounded.Slideshow, Routes.PRESENTER, gel = 0xFFF5C542),
+    HomeTile("Gamepad", "Game controller", Icons.Rounded.Gamepad, Routes.GAMEPAD, gel = 0xFFFF5C8A),
+    HomeTile("Layouts", "Custom control screens", Icons.Rounded.Dashboard, Routes.LAYOUTS, gel = 0xFF2ED5A5),
+    HomeTile("Macros", "Record & play sequences", Icons.Rounded.Bolt, Routes.MACROS, gel = 0xFF57D163),
+    HomeTile("Themes", "Change the whole look", Icons.Rounded.Palette, Routes.THEMES, gel = 0xFFB86BFF),
+    HomeTile("Pad Builder", "Design your own gamepad", Icons.Rounded.SportsEsports, Routes.GAMEPAD_BUILDER, gel = 0xFF6E8BFF),
+    HomeTile("Settings", "Tune everything", Icons.Rounded.Settings, Routes.SETTINGS, gel = 0xFF8B9BB5),
+    HomeTile("Help", "Pairing & troubleshooting", Icons.AutoMirrored.Rounded.HelpOutline, Routes.HELP, gel = 0xFF64B6F0)
 )
 
 @Composable
@@ -144,13 +149,38 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
         elevation = CardDefaults.cardElevation(defaultElevation = if (enabled) 2.dp else 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(
-                imageVector = tile.icon,
-                contentDescription = tile.title,
-                tint = if (enabled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(28.dp)
-            )
+            // Gel icon badge (designs/glass-01): vivid per-tile gradient with
+            // a soft top highlight, white glyph — the glassy gummy look.
+            val gel = androidx.compose.ui.graphics.Color(tile.gel.toULong().toLong() and 0xFFFFFFFF)
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = if (enabled) listOf(
+                                gel.copy(alpha = 1f),
+                                gel.copy(red = (gel.red * 0.72f), green = (gel.green * 0.72f), blue = (gel.blue * 0.72f))
+                            ) else listOf(
+                                MaterialTheme.colorScheme.outline,
+                                MaterialTheme.colorScheme.outline
+                            )
+                        ),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                    ),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                Icon(
+                    imageVector = tile.icon,
+                    contentDescription = tile.title,
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Text(
                 text = tile.title,

@@ -143,7 +143,7 @@ private fun ThemeCard(
                 spec = spec,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .height(190.dp)
             )
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -182,9 +182,11 @@ private fun ThemeCard(
 }
 
 /**
- * Live mini-preview: paints a miniature home screen from the spec's own
- * tokens — orbs, glass status pill, 2x2 tile grid with colored icon dots,
- * and a nav dock. What you see is exactly what the theme produces.
+ * Live mini-preview (upgraded to match the v2-02 mockup):
+ * a miniature phone UI painted from the spec's own tokens — status bar
+ * "9:41", glass status pill with green dot + signal bars, four labeled
+ * tiles each with a colored gel icon dot AND a text line, and a nav dock
+ * with three icon dots. What you see is exactly what the theme produces.
  */
 @Composable
 private fun ThemeMiniPreview(spec: AppThemeSpec, modifier: Modifier = Modifier) {
@@ -212,6 +214,7 @@ private fun ThemeMiniPreview(spec: AppThemeSpec, modifier: Modifier = Modifier) 
             val r = spec.cornerRadius * size.width / 360f * 2f
             val surface = spec.surface.copy(alpha = spec.surfaceAlpha)
             val corner = androidx.compose.ui.geometry.CornerRadius(r, r)
+            val textDim = spec.onSurfaceVariant.copy(alpha = 0.85f)
 
             fun panel(x: Float, y: Float, w: Float, h: Float) {
                 drawRoundRect(
@@ -222,48 +225,99 @@ private fun ThemeMiniPreview(spec: AppThemeSpec, modifier: Modifier = Modifier) 
                 )
                 if (spec.edgeGlow) {
                     drawRoundRect(
-                        color = (spec.glowColor ?: spec.onSurface).copy(alpha = 0.28f),
+                        color = (spec.glowColor ?: spec.onSurface).copy(alpha = 0.30f),
                         topLeft = Offset(x, y),
                         size = androidx.compose.ui.geometry.Size(w, h),
                         cornerRadius = corner,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.4f)
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.6f)
                     )
                 }
             }
 
-            // Status pill with connected dot
-            val pillH = size.height * 0.14f
-            panel(pad, pad, size.width - 2 * pad, pillH)
+            /** A tiny "text line" bar — mimics labels in the mockups. */
+            fun textLine(x: Float, y: Float, w: Float, thickness: Float, color: androidx.compose.ui.graphics.Color) {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(x, y),
+                    size = androidx.compose.ui.geometry.Size(w, thickness),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(thickness / 2f, thickness / 2f)
+                )
+            }
+
+            // ---- Fake status bar: time line left, signal dots right ----
+            val sbY = pad * 0.55f
+            textLine(pad, sbY, size.width * 0.12f, size.height * 0.022f, textDim)
+            for (i in 0..2) {
+                drawCircle(
+                    color = textDim,
+                    radius = size.height * 0.011f,
+                    center = Offset(size.width - pad - i * size.width * 0.045f, sbY + size.height * 0.011f)
+                )
+            }
+
+            // ---- Status pill: green dot + device text line + signal bars ----
+            val pillY = pad * 1.6f
+            val pillH = size.height * 0.13f
+            panel(pad, pillY, size.width - 2 * pad, pillH)
             drawCircle(
                 color = spec.connected,
-                radius = pillH * 0.20f,
-                center = Offset(pad + pillH * 0.5f, pad + pillH * 0.5f)
+                radius = pillH * 0.18f,
+                center = Offset(pad + pillH * 0.45f, pillY + pillH * 0.5f)
             )
+            textLine(pad + pillH * 0.85f, pillY + pillH * 0.38f, size.width * 0.32f, pillH * 0.16f, spec.onSurface.copy(alpha = 0.9f))
+            // signal bars
+            for (i in 0..2) {
+                val bh = pillH * (0.22f + 0.14f * i)
+                drawRoundRect(
+                    color = spec.primary,
+                    topLeft = Offset(size.width - pad - pillH * 0.35f - i * pillH * 0.22f, pillY + pillH * 0.72f - bh),
+                    size = androidx.compose.ui.geometry.Size(pillH * 0.12f, bh),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                )
+            }
 
-            // 2x2 tile grid with theme-colored icon dots
-            val gridTop = pad + pillH + size.height * 0.06f
+            // ---- 2x2 tiles: gel icon square + label line each ----
+            val gridTop = pillY + pillH + size.height * 0.05f
             val gap = size.width * 0.045f
             val tileW = (size.width - 2 * pad - gap) / 2f
-            val tileH = size.height * 0.22f
-            val iconColors = listOf(spec.primary, spec.secondary, spec.connected, spec.error)
+            val tileH = size.height * 0.235f
+            val gels = listOf(
+                spec.primary, spec.secondary,
+                spec.connected, spec.error
+            )
             var i = 0
             for (row in 0..1) {
                 for (col in 0..1) {
                     val x = pad + col * (tileW + gap)
                     val y = gridTop + row * (tileH + gap)
                     panel(x, y, tileW, tileH)
-                    drawCircle(
-                        color = iconColors[i % iconColors.size].copy(alpha = 0.9f),
-                        radius = tileH * 0.18f,
-                        center = Offset(x + tileW * 0.5f, y + tileH * 0.42f)
+                    // gel icon: small rounded square, vivid
+                    val gelSize = tileH * 0.34f
+                    drawRoundRect(
+                        color = gels[i % gels.size],
+                        topLeft = Offset(x + tileW * 0.5f - gelSize / 2f, y + tileH * 0.16f),
+                        size = androidx.compose.ui.geometry.Size(gelSize, gelSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(gelSize * 0.3f, gelSize * 0.3f)
                     )
+                    // label line under the gel
+                    textLine(x + tileW * 0.28f, y + tileH * 0.66f, tileW * 0.44f, tileH * 0.09f, textDim)
                     i++
                 }
             }
 
-            // Bottom nav dock
-            val dockH = size.height * 0.10f
-            panel(size.width * 0.22f, size.height - dockH - pad * 0.7f, size.width * 0.56f, dockH)
+            // ---- Nav dock with three icon dots ----
+            val dockH = size.height * 0.095f
+            val dockW = size.width * 0.56f
+            val dockX = (size.width - dockW) / 2f
+            val dockY = size.height - dockH - pad * 0.6f
+            panel(dockX, dockY, dockW, dockH)
+            for (d in 0..2) {
+                drawCircle(
+                    color = if (d == 0) spec.primary else textDim,
+                    radius = dockH * 0.18f,
+                    center = Offset(dockX + dockW * (0.25f + 0.25f * d), dockY + dockH * 0.5f)
+                )
+            }
         }
     }
 }
