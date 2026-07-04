@@ -42,11 +42,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import com.bluepilot.remote.ui.components.GlassCard
 import com.bluepilot.remote.ui.theme.AppThemeSpec
 import com.bluepilot.remote.ui.theme.BuiltInThemes
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 import com.bluepilot.remote.viewmodel.SettingsViewModel
 import kotlin.math.max
 
@@ -127,16 +131,23 @@ private fun ThemeCard(
     isActive: Boolean,
     onApply: () -> Unit
 ) {
-    Card(
+    val localTheme = LocalAppTheme.current
+    val borderGlowColor = spec.glowColor ?: spec.primary
+    val borderModifier = if (isActive) {
+        Modifier.graphicsLayer {
+            shadowElevation = 8.dp.toPx()
+            shape = RoundedCornerShape(18.dp)
+            clip = false
+            spotShadowColor = borderGlowColor
+            ambientShadowColor = borderGlowColor
+        }.border(2.dp, borderGlowColor, RoundedCornerShape(18.dp))
+    } else Modifier
+
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isActive) Modifier.border(
-                    2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp)
-                ) else Modifier
-            ),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            .then(borderModifier),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column {
             ThemeMiniPreview(
@@ -150,9 +161,13 @@ private fun ThemeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(spec.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (spec.isDark) "Dark" else "Light",
+                        text = if (localTheme.monoFont) spec.name.uppercase() else spec.name,
+                        style = if (localTheme.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (localTheme.monoFont) (if (spec.isDark) "DARK" else "LIGHT") else (if (spec.isDark) "Dark" else "Light"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,7 +176,7 @@ private fun ThemeCard(
                     Icon(
                         Icons.Rounded.CheckCircle,
                         contentDescription = "Active theme",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = borderGlowColor,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -169,11 +184,11 @@ private fun ThemeCard(
             Box(modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                 if (isActive) {
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                        Text("Applied")
+                        Text(if (localTheme.monoFont) "APPLIED" else "Applied")
                     }
                 } else {
                     Button(onClick = onApply, modifier = Modifier.fillMaxWidth()) {
-                        Text("Apply")
+                        Text(if (localTheme.monoFont) "APPLY" else "Apply")
                     }
                 }
             }

@@ -22,6 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.bluepilot.remote.model.widgets.LayoutSpec
 import com.bluepilot.remote.model.widgets.WidgetSpec
 import com.bluepilot.remote.model.widgets.WidgetType
+import com.bluepilot.remote.ui.components.cornerBrackets
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 import kotlin.math.roundToInt
 
 /**
@@ -90,8 +95,17 @@ fun RenderWidget(
     val fg = Color(style.contentColor.toULong().toLong() and 0xFFFFFFFF)
     val shape = RoundedCornerShape(style.cornerRadius.dp)
 
+    val themeSpec = LocalAppTheme.current
+    val cornerBracketsModifier = if (themeSpec.monoFont) {
+        Modifier.cornerBrackets(
+            color = themeSpec.glowColor ?: fg,
+            bracketLength = 10.dp,
+            strokeWidth = 2.dp
+        )
+    } else Modifier
+
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(cornerBracketsModifier),
         color = bg,
         contentColor = fg,
         shape = shape,
@@ -276,9 +290,15 @@ private fun DpadArrow(glyph: String, cell: Dp, fg: Color, onTap: () -> Unit) {
  * SECTION 3A — Gesture zone.
  * One finger: accumulate drag → classify swipe on release (up/down/left/right).
  * Two fingers down together: two-finger tap. All bindable per direction.
+ * Visual: 4 glowing directional arrows drawn via canvas for a premium HUD look.
  */
 @Composable
 private fun GestureZoneBody(widget: WidgetSpec, events: WidgetEvents, fg: Color) {
+    val themeSpec = LocalAppTheme.current
+    // Glow color — use theme glowColor if available, else use fg
+    val arrowColor = (themeSpec.glowColor ?: fg).copy(alpha = 0.75f)
+    val arrowGlow  = arrowColor.copy(alpha = 0.25f)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -289,7 +309,6 @@ private fun GestureZoneBody(widget: WidgetSpec, events: WidgetEvents, fg: Color)
                         val pressedCount = event.changes.count { it.pressed }
                         if (pressedCount >= 2) {
                             events.onTwoFingerTap(widget)
-                            // Swallow until all fingers lift (one fire per gesture).
                             do {
                                 val e = awaitPointerEvent()
                             } while (e.changes.any { it.pressed })
@@ -319,11 +338,105 @@ private fun GestureZoneBody(widget: WidgetSpec, events: WidgetEvents, fg: Color)
             },
         contentAlignment = Alignment.Center
     ) {
-        WidgetLabel(
-            widget.style.icon,
-            widget.style.label.ifBlank { "⇦⇧⇨⇩" },
-            widget.style.fontSize,
-            fg.copy(alpha = 0.55f)
-        )
+        // Draw 4 glowing directional arrows using canvas
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val w = size.width
+            val h = size.height
+            val arrowSize = minOf(w, h) * 0.14f
+            val tipOffset = minOf(w, h) * 0.28f
+            val strokePx = 3.5f
+
+            // Draw each arrow: UP, DOWN, LEFT, RIGHT
+            drawGlowArrow(
+                direction = ArrowDir.UP,
+                center = Offset(w / 2f, h / 2f - tipOffset),
+                arrowSize = arrowSize,
+                color = arrowColor,
+                glowColor = arrowGlow,
+                strokeWidth = strokePx
+            )
+            drawGlowArrow(
+                direction = ArrowDir.DOWN,
+                center = Offset(w / 2f, h / 2f + tipOffset),
+                arrowSize = arrowSize,
+                color = arrowColor,
+                glowColor = arrowGlow,
+                strokeWidth = strokePx
+            )
+            drawGlowArrow(
+                direction = ArrowDir.LEFT,
+                center = Offset(w / 2f - tipOffset, h / 2f),
+                arrowSize = arrowSize,
+                color = arrowColor,
+                glowColor = arrowGlow,
+                strokeWidth = strokePx
+            )
+            drawGlowArrow(
+                direction = ArrowDir.RIGHT,
+                center = Offset(w / 2f + tipOffset, h / 2f),
+                arrowSize = arrowSize,
+                color = arrowColor,
+                glowColor = arrowGlow,
+                strokeWidth = strokePx
+            )
+        }
     }
+}
+
+private enum class ArrowDir { UP, DOWN, LEFT, RIGHT }
+
+/**
+ * Draws a chevron arrow pointing [direction] at [center] with a soft glow halo.
+ */
+private fun DrawScope.drawGlowArrow(
+    direction: ArrowDir,
+    center: Offset,
+    arrowSize: Float,
+    color: Color,
+    glowColor: Color,
+    strokeWidth: Float
+) {
+    val half = arrowSize / 2f
+    // Build chevron path relative to a UP-pointing arrow, then rotate
+    val path = Path().apply {
+        when (direction) {
+            ArrowDir.UP -> {
+                moveTo(center.x - half, center.y + half * 0.6f)
+                lineTo(center.x, center.y - half * 0.6f)
+                lineTo(center.x + half, center.y + half * 0.6f)
+            }
+            ArrowDir.DOWN -> {
+                moveTo(center.x - half, center.y - half * 0.6f)
+                lineTo(center.x, center.y + half * 0.6f)
+                lineTo(center.x + half, center.y - half * 0.6f)
+            }
+            ArrowDir.LEFT -> {
+                moveTo(center.x + half * 0.6f, center.y - half)
+                lineTo(center.x - half * 0.6f, center.y)
+                lineTo(center.x + half * 0.6f, center.y + half)
+            }
+            ArrowDir.RIGHT -> {
+                moveTo(center.x - half * 0.6f, center.y - half)
+                lineTo(center.x + half * 0.6f, center.y)
+                lineTo(center.x - half * 0.6f, center.y + half)
+            }
+        }
+    }
+
+    // Glow pass (thicker, transparent)
+    drawPath(
+        path = path,
+        color = glowColor,
+        style = Stroke(width = strokeWidth * 4f, cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    )
+    // Solid arrow
+    drawPath(
+        path = path,
+        color = color,
+        style = Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round)
+    )
 }

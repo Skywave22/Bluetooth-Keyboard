@@ -1,7 +1,10 @@
 package com.bluepilot.remote.ui.screens.macros
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,26 +17,30 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FiberManualRecord
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.HidConsumer
@@ -49,7 +60,9 @@ import com.bluepilot.remote.model.HidKeys
 import com.bluepilot.remote.model.HidModifiers
 import com.bluepilot.remote.model.macros.MacroSpec
 import com.bluepilot.remote.model.macros.MacroStep
+import com.bluepilot.remote.ui.components.GlassCard
 import com.bluepilot.remote.ui.components.NotConnectedBanner
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 import com.bluepilot.remote.viewmodel.MacrosViewModel
 
 /**
@@ -75,62 +88,149 @@ fun MacrosScreen(
     val isConnected by viewModel.isConnected.collectAsState()
     val isRecording by viewModel.isRecording.collectAsState()
     val recordedSteps by viewModel.recordedSteps.collectAsState()
+    val spec = LocalAppTheme.current
+
+    // Red glow color for recording state
+    val recRedColor = Color(0xFFFF2D55)
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Macros") },
+                title = {
+                    Text(
+                        text = if (spec.monoFont) "MACROS" else "Macros",
+                        style = if (spec.monoFont) MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.newMacro() }) {
-                Icon(Icons.Rounded.Add, contentDescription = "New macro")
+            FloatingActionButton(
+                onClick = { viewModel.newMacro() },
+                containerColor = spec.primary
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = "New macro", tint = Color.White)
             }
         },
         bottomBar = {
-            // SECTION 3A — Recorder bar: arm → use ANY control screen
-            // (keyboard/media/mouse clicks are captured) → stop = draft.
-            Card(
+            // Frosted glass recorder bar — red-tinted when recording
+            val recorderAlpha = if (isRecording) 0.18f else spec.surfaceAlpha * 0.8f
+            val recorderBgColor = if (isRecording)
+                recRedColor.copy(alpha = recorderAlpha)
+            else
+                spec.surface.copy(alpha = recorderAlpha)
+
+            val recorderBorderColor = if (isRecording)
+                recRedColor.copy(alpha = 0.6f)
+            else
+                spec.outline.copy(alpha = 0.3f)
+
+            val recorderGlowModifier = if (isRecording) {
+                Modifier.drawBehind {
+                    drawRoundRect(
+                        color = recRedColor.copy(alpha = 0.25f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                        size = size.copy(
+                            width = size.width + 16.dp.toPx(),
+                            height = size.height + 16.dp.toPx()
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(-8.dp.toPx(), -8.dp.toPx())
+                    )
+                }
+            } else Modifier
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isRecording) MaterialTheme.colorScheme.errorContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .then(recorderGlowModifier)
+                    .background(recorderBgColor, RoundedCornerShape(16.dp))
+                    .border(1.dp, recorderBorderColor, RoundedCornerShape(16.dp))
             ) {
+                // Top sheen
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0f))
+                            ),
+                            RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                        )
+                )
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isRecording) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FiberManualRecord,
+                                    contentDescription = null,
+                                    tint = recRedColor,
+                                    modifier = Modifier.size(12.dp).padding(end = 4.dp)
+                                )
+                                Spacer(Modifier.size(4.dp))
+                            }
+                            Text(
+                                text = if (spec.monoFont) {
+                                    if (isRecording) "REC — $recordedSteps STEPS" else "MACRO RECORDER"
+                                } else {
+                                    if (isRecording) "● REC — $recordedSteps steps captured" else "Macro recorder"
+                                },
+                                style = if (spec.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+                                else MaterialTheme.typography.titleMedium,
+                                color = if (isRecording) recRedColor else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Text(
-                            if (isRecording) "● REC — $recordedSteps steps captured"
-                            else "Macro recorder",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (isRecording) MaterialTheme.colorScheme.onErrorContainer
-                            else MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            if (isRecording) "Go use Keyboard/Media/Mouse — then come back and stop."
-                            else "Record real inputs from any screen, replay with one tap.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = if (spec.monoFont) {
+                                if (isRecording) "USE KEYBOARD/MEDIA/MOUSE → STOP TO SAVE"
+                                else "RECORD INPUTS FROM ANY SCREEN. REPLAY WITH ONE TAP."
+                            } else {
+                                if (isRecording) "Go use Keyboard/Media/Mouse — then come back and stop."
+                                else "Record real inputs from any screen, replay with one tap."
+                            },
+                            style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                            else MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Spacer(Modifier.size(12.dp))
                     if (isRecording) {
-                        androidx.compose.material3.Button(onClick = { viewModel.stopRecording() }) {
-                            Text("Stop")
+                        Button(
+                            onClick = { viewModel.stopRecording() },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = recRedColor
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text(if (spec.monoFont) "STOP" else "Stop")
                         }
                     } else {
-                        androidx.compose.material3.OutlinedButton(onClick = { viewModel.startRecording() }) {
-                            Text("● Record")
+                        OutlinedButton(
+                            onClick = { viewModel.startRecording() },
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, spec.primary.copy(alpha = 0.6f)),
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                contentColor = spec.primary
+                            )
+                        ) {
+                            Icon(Icons.Rounded.FiberManualRecord, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text(if (spec.monoFont) "RECORD" else "● Record")
                         }
                     }
                 }
@@ -148,33 +248,39 @@ fun MacrosScreen(
                 Column {
                     NotConnectedBanner(!isConnected)
                     Text(
-                        text = "Macros are step sequences (keys, chords, text, delays). " +
-                            "Bind one to any custom button in the Layout editor.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = if (spec.monoFont)
+                            "MACROS ARE STEP SEQUENCES (KEYS, CHORDS, TEXT, DELAYS). BIND ONE TO ANY CUSTOM BUTTON IN THE LAYOUT EDITOR."
+                        else
+                            "Macros are step sequences (keys, chords, text, delays). " +
+                                "Bind one to any custom button in the Layout editor.",
+                        style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
             }
             items(macros, key = { it.id }) { macro ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(macro.spec.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = if (spec.monoFont) macro.spec.name.uppercase() else macro.spec.name,
+                                style = if (spec.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+                                else MaterialTheme.typography.titleMedium
+                            )
                             Text(
                                 text = "${macro.spec.steps.size} steps  •  id ${macro.id}",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                                else MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = { viewModel.play(macro.id) }) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", tint = spec.primary)
                         }
                         IconButton(onClick = { viewModel.edit(macro) }) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Edit")
@@ -185,6 +291,7 @@ fun MacrosScreen(
                     }
                 }
             }
+            item { Spacer(Modifier.height(80.dp)) }
         }
     }
 }
@@ -198,13 +305,24 @@ fun MacrosScreen(
 private fun MacroEditor(viewModel: MacrosViewModel) {
     val draft by viewModel.draft.collectAsState()
     val (rowId, spec) = draft ?: return
+    val themeSpec = LocalAppTheme.current
     var textInput by remember { mutableStateOf("") }
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(if (rowId == null) "New macro" else "Edit macro") },
+                title = {
+                    Text(
+                        text = if (themeSpec.monoFont) {
+                            if (rowId == null) "NEW MACRO" else "EDIT MACRO"
+                        } else {
+                            if (rowId == null) "New macro" else "Edit macro"
+                        },
+                        style = if (themeSpec.monoFont) MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.closeDraft() }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
@@ -217,7 +335,8 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
                     IconButton(onClick = { viewModel.saveDraft() }) {
                         Icon(Icons.Rounded.Save, contentDescription = "Save")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
@@ -230,16 +349,24 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
             OutlinedTextField(
                 value = spec.name,
                 onValueChange = viewModel::renameDraft,
-                label = { Text("Macro name") },
+                label = {
+                    Text(
+                        if (themeSpec.monoFont) "MACRO NAME" else "Macro name",
+                        style = if (themeSpec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.bodyMedium
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
             // ---------- Step palette ----------
             Text(
-                "Add step (${spec.steps.size}/${MacroSpec.STEPS_MAX})",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
+                text = if (themeSpec.monoFont) "ADD STEP (${spec.steps.size}/${MacroSpec.STEPS_MAX})"
+                else "Add step (${spec.steps.size}/${MacroSpec.STEPS_MAX})",
+                style = if (themeSpec.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+                else MaterialTheme.typography.titleMedium,
+                color = themeSpec.primary,
                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
             )
             StepChipRow(
@@ -275,7 +402,13 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = { textInput = it },
-                    label = { Text("Text step") },
+                    label = {
+                        Text(
+                            if (themeSpec.monoFont) "TEXT STEP" else "Text step",
+                            style = if (themeSpec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                            else MaterialTheme.typography.bodyMedium
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
@@ -287,15 +420,16 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
                             textInput = ""
                         }
                     },
-                    label = { Text("Add") }
+                    label = { Text(if (themeSpec.monoFont) "ADD" else "Add") }
                 )
             }
 
             // ---------- Step list ----------
             Text(
-                "Steps",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
+                text = if (themeSpec.monoFont) "STEPS" else "Steps",
+                style = if (themeSpec.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+                else MaterialTheme.typography.titleMedium,
+                color = themeSpec.primary,
                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
             )
             LazyColumn(
@@ -303,14 +437,15 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 itemsIndexed(spec.steps) { index, step ->
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.padding(start = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "${index + 1}. ${stepLabel(step)}",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = if (themeSpec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                                else MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(onClick = { viewModel.moveStepUp(index) }) {
@@ -333,6 +468,7 @@ private fun StepChipRow(
     entries: List<Pair<String, MacroStep>>,
     onAdd: (MacroStep) -> Unit
 ) {
+    val themeSpec = LocalAppTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -341,7 +477,16 @@ private fun StepChipRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         entries.forEach { (label, step) ->
-            AssistChip(onClick = { onAdd(step) }, label = { Text(label) })
+            AssistChip(
+                onClick = { onAdd(step) },
+                label = {
+                    Text(
+                        text = if (themeSpec.monoFont) label.uppercase() else label,
+                        style = if (themeSpec.monoFont) MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.labelLarge
+                    )
+                }
+            )
         }
     }
 }

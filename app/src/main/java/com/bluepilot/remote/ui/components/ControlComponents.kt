@@ -28,6 +28,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import com.bluepilot.remote.model.HapticIntensity
 import com.bluepilot.remote.ui.theme.LocalAppTheme
 
@@ -87,46 +90,100 @@ fun KeyCard(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 800f),
         label = "keyPressScale"
     )
-    // Liquid-glass edge light: themes with edgeGlow get a thin luminous rim
-    // on every key (designs/glass-*, hud-*, lgm-* signature detail).
     val spec = LocalAppTheme.current
-    val edgeModifier = if (spec.edgeGlow) {
-        Modifier.border(
-            width = 1.dp,
-            color = (spec.glowColor ?: spec.onSurface).copy(alpha = 0.22f),
-            shape = MaterialTheme.shapes.medium
-        )
-    } else Modifier
+    val shape = MaterialTheme.shapes.medium
 
-    Card(
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .heightIn(min = height)
-            .then(edgeModifier)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = androidx.compose.foundation.LocalIndication.current,
-                enabled = enabled,
-                onClick = onClick
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (emphasized) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
+    // Monospace & uppercase for HUD theme compatibility
+    val finalLabel = if (spec.monoFont) label.uppercase() else label
+    val labelStyle = if (spec.monoFont) {
+        MaterialTheme.typography.labelLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+    } else {
+        MaterialTheme.typography.labelLarge
+    }
+
+    val contentColor = if (emphasized) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val baseModifier = modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .heightIn(min = height)
+        .clickable(
+            interactionSource = interactionSource,
+            indication = androidx.compose.foundation.LocalIndication.current,
+            enabled = enabled,
+            onClick = onClick
         )
-    ) {
-        Box(modifier = Modifier.fillMaxSize().heightIn(min = height), contentAlignment = Alignment.Center) {
+
+    if (spec.surfaceAlpha < 1f) {
+        // Glass look: use custom sheen gradient and border
+        val surfaceColor = if (emphasized) {
+            spec.primary.copy(alpha = 0.35f)
+        } else {
+            spec.surfaceVariant.copy(alpha = spec.surfaceAlpha)
+        }
+
+        val sheenBrush = Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0f)
+            )
+        )
+
+        val borderBrush = Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.35f),
+                spec.outline.copy(alpha = 0.15f)
+            )
+        )
+
+        Box(
+            modifier = baseModifier
+                .background(surfaceColor, shape)
+                .background(sheenBrush, shape)
+                .border(1.dp, borderBrush, shape),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (emphasized) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurface,
+                text = finalLabel,
+                style = labelStyle,
+                color = contentColor,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
+        }
+    } else {
+        // Flat/Default look
+        val edgeModifier = if (spec.edgeGlow) {
+            Modifier.border(
+                width = 1.dp,
+                color = (spec.glowColor ?: spec.onSurface).copy(alpha = 0.22f),
+                shape = shape
+            )
+        } else Modifier
+
+        Card(
+            shape = shape,
+            modifier = baseModifier.then(edgeModifier),
+            colors = CardDefaults.cardColors(
+                containerColor = if (emphasized) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Box(modifier = Modifier.fillMaxSize().heightIn(min = height), contentAlignment = Alignment.Center) {
+                Text(
+                    text = finalLabel,
+                    style = labelStyle,
+                    color = contentColor,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
         }
     }
 }

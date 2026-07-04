@@ -1,5 +1,6 @@
 package com.bluepilot.remote.ui.screens.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,31 +9,38 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.GamepadMappingMode
 import com.bluepilot.remote.model.HapticIntensity
 import com.bluepilot.remote.model.ThemeMode
+import com.bluepilot.remote.ui.components.GlassCard
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 import com.bluepilot.remote.viewmodel.SettingsViewModel
 
 /**
@@ -52,17 +60,19 @@ fun SettingsScreen(
     val mouse by viewModel.mouse.collectAsState()
     val keyboard by viewModel.keyboard.collectAsState()
     val gamepad by viewModel.gamepad.collectAsState()
+    val spec = LocalAppTheme.current
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(if (spec.monoFont) "SETTINGS" else "Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
@@ -75,18 +85,44 @@ fun SettingsScreen(
         ) {
             // ---------- General ----------
             SettingsGroup("General") {
-                androidx.compose.material3.OutlinedButton(
+                OutlinedButton(
                     onClick = onOpenThemes,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Open theme gallery") }
-                Spacer(Modifier.height(8.dp))
-                Text("Theme", style = MaterialTheme.typography.bodyMedium)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = spec.primary
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = spec.primary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text(
+                        text = if (spec.monoFont) "OPEN THEME GALLERY" else "Open theme gallery",
+                        style = if (spec.monoFont) MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.labelLarge
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = if (spec.monoFont) "THEME" else "Theme",
+                    style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                    else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Row(modifier = Modifier.padding(vertical = 4.dp)) {
                     ThemeMode.entries.forEach { mode ->
+                        val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
                         FilterChip(
                             selected = app.theme == mode,
                             onClick = { viewModel.setTheme(mode) },
-                            label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            label = {
+                                Text(
+                                    text = if (spec.monoFont) label.uppercase() else label,
+                                    style = if (spec.monoFont) MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace)
+                                    else MaterialTheme.typography.labelLarge
+                                )
+                            },
                             modifier = Modifier.padding(end = 8.dp)
                         )
                     }
@@ -95,13 +131,25 @@ fun SettingsScreen(
                 ToggleRow("Keep screen on", app.keepScreenOn, viewModel::setKeepScreenOn)
                 ToggleRow("Touch vibrations", app.touchVibrations, viewModel::setTouchVibrations)
                 if (app.touchVibrations) {
-                    Text("Vibration strength", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = if (spec.monoFont) "VIBRATION STRENGTH" else "Vibration strength",
+                        style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Row(modifier = Modifier.padding(vertical = 4.dp)) {
                         HapticIntensity.entries.forEach { level ->
+                            val label = level.name.lowercase().replaceFirstChar { it.uppercase() }
                             FilterChip(
                                 selected = app.hapticIntensity == level,
                                 onClick = { viewModel.setHapticIntensity(level) },
-                                label = { Text(level.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                label = {
+                                    Text(
+                                        text = if (spec.monoFont) label.uppercase() else label,
+                                        style = if (spec.monoFont) MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace)
+                                        else MaterialTheme.typography.labelLarge
+                                    )
+                                },
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                         }
@@ -132,13 +180,25 @@ fun SettingsScreen(
 
             // ---------- Gamepad ----------
             SettingsGroup("Gamepad") {
-                Text("Mode", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = if (spec.monoFont) "MODE" else "Mode",
+                    style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                    else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     GamepadMappingMode.entries.forEach { mode ->
+                        val label = gamepadModeLabel(mode)
                         FilterChip(
                             selected = gamepad.mappingMode == mode,
                             onClick = { viewModel.setGamepadMode(mode) },
-                            label = { Text(gamepadModeLabel(mode)) },
+                            label = {
+                                Text(
+                                    text = if (spec.monoFont) label.uppercase() else label,
+                                    style = if (spec.monoFont) MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace)
+                                    else MaterialTheme.typography.labelLarge
+                                )
+                            },
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
@@ -168,13 +228,15 @@ private fun gamepadModeLabel(mode: GamepadMappingMode): String = when (mode) {
 
 @Composable
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+    val spec = LocalAppTheme.current
     Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
+        text = if (spec.monoFont) title.uppercase() else title,
+        style = if (spec.monoFont) MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
+        else MaterialTheme.typography.titleMedium,
+        color = spec.primary,
         modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
     )
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    GlassCard {
         Column(modifier = Modifier.padding(16.dp)) { content() }
     }
 }
@@ -186,6 +248,7 @@ private fun ToggleRow(
     onChange: (Boolean) -> Unit,
     subtitle: String? = null
 ) {
+    val spec = LocalAppTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -193,16 +256,31 @@ private fun ToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = if (spec.monoFont) title.uppercase() else title,
+                style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                else MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (subtitle != null) {
                 Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = if (spec.monoFont) subtitle.uppercase() else subtitle,
+                    style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                    else MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = spec.primary,
+                checkedTrackColor = spec.primary.copy(alpha = 0.35f),
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = Color.Transparent
+            )
+        )
     }
 }
 
@@ -213,19 +291,32 @@ private fun SliderRow(
     onChange: (Int) -> Unit,
     max: Int = 100
 ) {
+    val spec = LocalAppTheme.current
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Text(
-                "$value",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
+                text = if (spec.monoFont) title.uppercase() else title,
+                style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                else MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "$value",
+                style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                else MaterialTheme.typography.bodyMedium,
+                color = spec.primary
             )
         }
         Slider(
             value = value.toFloat(),
             onValueChange = { onChange(it.toInt()) },
-            valueRange = 0f..max.toFloat()
+            valueRange = 0f..max.toFloat(),
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = spec.primary,
+                activeTrackColor = spec.primary,
+                inactiveTrackColor = spec.outline.copy(alpha = 0.3f)
+            )
         )
     }
 }

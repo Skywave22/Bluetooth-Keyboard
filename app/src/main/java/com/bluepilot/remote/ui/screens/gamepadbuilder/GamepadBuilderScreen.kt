@@ -69,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.gamepad.ControlShape
@@ -81,6 +82,9 @@ import com.bluepilot.remote.ui.gamepad.GamepadCanvas
 import com.bluepilot.remote.ui.gamepad.GamepadEvents
 import com.bluepilot.remote.ui.gamepad.RenderGamepadControl
 import com.bluepilot.remote.viewmodel.GamepadBuilderViewModel
+import com.bluepilot.remote.ui.components.GlassCard
+import com.bluepilot.remote.ui.components.cornerBrackets
+import com.bluepilot.remote.ui.theme.LocalAppTheme
 import timber.log.Timber
 
 /**
@@ -339,25 +343,37 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (!previewMode) {
-                Row(
+                val themeSpec = LocalAppTheme.current
+                GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (selectedId == null) {
-                        Text("Add:", style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        AssistChip(onClick = { viewModel.addControl(GamepadControlType.BUTTON) }, label = { Text("Button") })
-                        AssistChip(onClick = { viewModel.addControl(GamepadControlType.TRIGGER) }, label = { Text("Trigger") })
-                        AssistChip(onClick = { viewModel.addControl(GamepadControlType.STICK) }, label = { Text("Stick") })
-                        AssistChip(onClick = { viewModel.addControl(GamepadControlType.DPAD) }, label = { Text("D-pad") })
-                    } else {
-                        AssistChip(onClick = { showProperties = true }, label = { Text("Properties") })
-                        AssistChip(onClick = { viewModel.removeSelected() }, label = { Text("Delete") })
-                        AssistChip(onClick = { viewModel.select(null) }, label = { Text("Deselect") })
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectedId == null) {
+                            Text(
+                                text = if (themeSpec.monoFont) "ADD:" else "Add:",
+                                style = if (themeSpec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                                else MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.BUTTON) }, label = { Text(if (themeSpec.monoFont) "BUTTON" else "Button") })
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.TRIGGER) }, label = { Text(if (themeSpec.monoFont) "TRIGGER" else "Trigger") })
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.STICK) }, label = { Text(if (themeSpec.monoFont) "STICK" else "Stick") })
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.DPAD) }, label = { Text(if (themeSpec.monoFont) "D-PAD" else "D-pad") })
+                        } else {
+                            AssistChip(onClick = { showProperties = true }, label = { Text(if (themeSpec.monoFont) "PROPERTIES" else "Properties") })
+                            AssistChip(onClick = { viewModel.removeSelected() }, label = { Text(if (themeSpec.monoFont) "DELETE" else "Delete") })
+                            AssistChip(onClick = { viewModel.select(null) }, label = { Text(if (themeSpec.monoFont) "DESELECT" else "Deselect") })
+                        }
                     }
                 }
             }
@@ -388,14 +404,22 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
                             RenderGamepadControl(control, playEvents, Modifier.fillMaxSize())
                         } else {
                             RenderGamepadControl(control, noOpGamepadEvents, Modifier.fillMaxSize())
+                            val themeSpec = LocalAppTheme.current
+                            val outlineColor = themeSpec.glowColor ?: MaterialTheme.colorScheme.primary
+                            val borderGlowModifier = if (isSelected) {
+                                if (themeSpec.monoFont) {
+                                    Modifier.cornerBrackets(outlineColor)
+                                } else {
+                                    Modifier.border(
+                                        2.dp, outlineColor, RoundedCornerShape(12.dp)
+                                    )
+                                }
+                            } else Modifier
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .then(
-                                        if (isSelected) Modifier.border(
-                                            2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)
-                                        ) else Modifier
-                                    )
+                                    .then(borderGlowModifier)
                                     .pointerInput(control.id + "-tap") {
                                         detectTapGestures(onTap = { viewModel.select(control.id) })
                                     }

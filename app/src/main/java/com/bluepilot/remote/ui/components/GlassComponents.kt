@@ -1,0 +1,173 @@
+package com.bluepilot.remote.ui.components
+
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.bluepilot.remote.ui.theme.LocalAppTheme
+
+/**
+ * Reusable GlassCard implementing the liquid-glass look:
+ * - Translucent surface (derived from active spec surfaceAlpha)
+ * - White sheen vertical gradient overlay (top ~12% alpha to 0%)
+ * - 1dp top-bright vertical gradient border
+ * - Optional system blur on Android 12+ (API 31+)
+ */
+@Composable
+fun GlassCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.medium,
+    borderWidth: Dp = 1.dp,
+    content: @Composable () -> Unit
+) {
+    val spec = LocalAppTheme.current
+    val surfaceAlpha = spec.surfaceAlpha
+    val surfaceColor = spec.surface.copy(alpha = surfaceAlpha)
+
+    val sheenBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.12f),
+            Color.White.copy(alpha = 0f)
+        )
+    )
+
+    val borderBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.35f),
+            spec.outline.copy(alpha = 0.12f)
+        )
+    )
+
+    val blurModifier = if (Build.VERSION.SDK_INT >= 31 && surfaceAlpha < 1f) {
+        Modifier.blur(16.dp)
+    } else Modifier
+
+    Box(
+        modifier = modifier
+            .then(blurModifier)
+            .background(surfaceColor, shape)
+            .background(sheenBrush, shape)
+            .border(borderWidth, borderBrush, shape)
+    ) {
+        content()
+    }
+}
+
+/**
+ * 3D Gel Icon badge:
+ * - Rounded-square badge with two-tone vertical gradient of the tile's hue
+ * - Inner top highlight (white-alpha rounded rectangle near top edge)
+ * - Thin white-alpha border
+ * - White icon inside
+ * - Spot shadow color matched to the hue for soft colored glow/shadow
+ */
+@Composable
+fun GelIcon(
+    color: Color,
+    icon: ImageVector,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    iconSize: Dp = 26.dp,
+    enabled: Boolean = true
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val factor = 0.72f
+    val bottomColor = Color(
+        red = (color.red * factor).coerceIn(0f, 1f),
+        green = (color.green * factor).coerceIn(0f, 1f),
+        blue = (color.blue * factor).coerceIn(0f, 1f),
+        alpha = color.alpha
+    )
+
+    val gradient = Brush.verticalGradient(
+        colors = if (enabled) listOf(color, bottomColor)
+        else listOf(MaterialTheme.colorScheme.outline, MaterialTheme.colorScheme.outline)
+    )
+
+    val shadowModifier = if (enabled) {
+        Modifier.graphicsLayer {
+            shadowElevation = 8.dp.toPx()
+            this.shape = shape
+            clip = false
+            spotShadowColor = color
+            ambientShadowColor = color
+        }
+    } else Modifier
+
+    Box(
+        modifier = modifier
+            .then(shadowModifier)
+            .size(size)
+            .background(gradient, shape)
+            .border(1.dp, Color.White.copy(alpha = 0.35f), shape),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(size * 0.22f)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(3.dp))
+        )
+
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+/**
+ * Custom Modifier for drawing selection HUD corner brackets instead of full borders.
+ */
+fun Modifier.cornerBrackets(
+    color: Color,
+    bracketLength: Dp = 12.dp,
+    strokeWidth: Dp = 2.dp
+) = drawWithContent {
+    drawContent()
+    val length = bracketLength.toPx()
+    val stroke = strokeWidth.toPx()
+    val w = size.width
+    val h = size.height
+
+    // Top-Left corner
+    drawLine(color, Offset(0f, 0f), Offset(length, 0f), strokeWidth = stroke)
+    drawLine(color, Offset(0f, 0f), Offset(0f, length), strokeWidth = stroke)
+
+    // Top-Right corner
+    drawLine(color, Offset(w, 0f), Offset(w - length, 0f), strokeWidth = stroke)
+    drawLine(color, Offset(w, 0f), Offset(w, length), strokeWidth = stroke)
+
+    // Bottom-Left corner
+    drawLine(color, Offset(0f, h), Offset(length, h), strokeWidth = stroke)
+    drawLine(color, Offset(0f, h), Offset(0f, h - length), strokeWidth = stroke)
+
+    // Bottom-Right corner
+    drawLine(color, Offset(w, h), Offset(w - length, h), strokeWidth = stroke)
+    drawLine(color, Offset(w, h), Offset(w, h - length), strokeWidth = stroke)
+}
