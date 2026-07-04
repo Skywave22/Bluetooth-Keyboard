@@ -58,6 +58,7 @@ fun KeyboardScreen(
     var text by remember { mutableStateOf("") }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("PC Keyboard") },
@@ -153,7 +154,7 @@ fun KeyboardScreen(
                         KeyCard("▶", modifier = Modifier.weight(1f)) { haptic(); viewModel.keyTap(HidKeys.ARROW_RIGHT) }
                     }
                 }
-                Column(modifier = Modifier.width(150.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         KeyCard("Home", modifier = Modifier.weight(1f)) { haptic(); viewModel.keyTap(HidKeys.HOME) }
                         KeyCard("End", modifier = Modifier.weight(1f)) { haptic(); viewModel.keyTap(HidKeys.END) }

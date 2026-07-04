@@ -178,6 +178,24 @@ class LayoutEditorViewModel @Inject constructor(
         mutate { LayoutEditorOps.updateWidget(it, id) { w -> w.copy(secondaryAction = action) } }
     }
 
+    /** GESTURE_ZONE: bind one swipe direction / two-finger tap. */
+    fun setSelectedGestureAction(slot: GestureSlot, action: WidgetAction) {
+        val id = _selectedId.value ?: return
+        mutate {
+            LayoutEditorOps.updateWidget(it, id) { w ->
+                when (slot) {
+                    GestureSlot.UP -> w.copy(swipeUp = action)
+                    GestureSlot.DOWN -> w.copy(swipeDown = action)
+                    GestureSlot.LEFT -> w.copy(swipeLeft = action)
+                    GestureSlot.RIGHT -> w.copy(swipeRight = action)
+                    GestureSlot.TWO_FINGER -> w.copy(twoFingerTap = action)
+                }
+            }
+        }
+    }
+
+    enum class GestureSlot { UP, DOWN, LEFT, RIGHT, TWO_FINGER }
+
     fun rename(name: String) = mutate { LayoutEditorOps.rename(it, name) }
 
     fun setGridSize(size: Float) = mutate { it.copy(gridSize = size) }

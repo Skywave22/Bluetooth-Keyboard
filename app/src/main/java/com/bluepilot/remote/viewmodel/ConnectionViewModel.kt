@@ -63,6 +63,9 @@ class ConnectionViewModel @Inject constructor(
     val permissionsGranted: StateFlow<Boolean> = _permissionsGranted.asStateFlow()
 
     private var scanJob: Job? = null
+    private var scanTimeoutJob: Job? = null
+    /** Generation counter: a stale auto-stop can never kill a newer scan. */
+    private var scanGeneration = 0
 
     // ------------------------------------------------------------------
 
@@ -107,6 +110,7 @@ class ConnectionViewModel @Inject constructor(
         if (_isScanning.value) return
         _discoveredDevices.value = emptyList()
         _isScanning.value = true
+        val generation = ++scanGeneration
         scanJob = scanner.scan()
             .onEach { device ->
                 val current = _discoveredDevices.value
@@ -116,14 +120,17 @@ class ConnectionViewModel @Inject constructor(
             }
             .catch { Timber.w(it, "scan flow error") }
             .launchIn(viewModelScope)
-        // Auto-stop after the scan window.
-        viewModelScope.launch {
+        // Auto-stop after the scan window. Generation check prevents a stale
+        // timer (from a previous scan) cancelling a scan the user restarted.
+        scanTimeoutJob = viewModelScope.launch {
             delay(SCAN_DURATION_MS)
-            stopScan()
+            if (generation == scanGeneration) stopScan()
         }
     }
 
     fun stopScan() {
+        scanTimeoutJob?.cancel()
+        scanTimeoutJob = null
         scanJob?.cancel()
         scanJob = null
         _isScanning.value = false

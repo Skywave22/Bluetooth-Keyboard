@@ -20,8 +20,10 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -65,6 +67,8 @@ private val tiles = listOf(
     HomeTile("Gamepad", "Game controller", Icons.Rounded.Gamepad, Routes.GAMEPAD),
     HomeTile("Layouts", "Custom control screens", Icons.Rounded.Dashboard, Routes.LAYOUTS),
     HomeTile("Macros", "Record & play sequences", Icons.Rounded.Bolt, Routes.MACROS),
+    HomeTile("Themes", "Change the whole look", Icons.Rounded.Palette, Routes.THEMES),
+    HomeTile("Pad Builder", "Design your own gamepad", Icons.Rounded.SportsEsports, Routes.GAMEPAD_BUILDER),
     HomeTile("Settings", "Tune everything", Icons.Rounded.Settings, Routes.SETTINGS),
     HomeTile("Help", "Pairing & troubleshooting", Icons.AutoMirrored.Rounded.HelpOutline, Routes.HELP)
 )
@@ -81,7 +85,7 @@ fun HomeScreen(
     // status card is truthful even before visiting the Connection screen.
     LaunchedEffect(Unit) { viewModel.initialize() }
 
-    Scaffold { padding ->
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

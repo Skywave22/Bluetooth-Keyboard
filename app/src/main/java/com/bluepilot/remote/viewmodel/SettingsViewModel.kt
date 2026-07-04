@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bluepilot.remote.domain.SettingsStore
 import com.bluepilot.remote.model.AppSettings
 import com.bluepilot.remote.model.GamepadMappingMode
+import com.bluepilot.remote.model.HapticIntensity
 import com.bluepilot.remote.model.GamepadSettings
 import com.bluepilot.remote.model.KeyboardSettings
 import com.bluepilot.remote.model.MouseSettings
@@ -39,9 +40,11 @@ class SettingsViewModel @Inject constructor(
 
     // ----- App -----
     fun setTheme(theme: ThemeMode) = updateApp { it.copy(theme = theme) }
+    fun setThemeId(id: String) = updateApp { it.copy(themeId = id) }
     fun setFullscreen(value: Boolean) = updateApp { it.copy(fullscreenMode = value) }
     fun setKeepScreenOn(value: Boolean) = updateApp { it.copy(keepScreenOn = value) }
     fun setTouchVibrations(value: Boolean) = updateApp { it.copy(touchVibrations = value) }
+    fun setHapticIntensity(value: HapticIntensity) = updateApp { it.copy(hapticIntensity = value) }
     fun setSecureScreen(value: Boolean) = updateApp { it.copy(secureScreen = value) }
 
     // ----- Mouse -----

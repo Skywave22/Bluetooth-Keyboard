@@ -1,39 +1,74 @@
 package com.bluepilot.remote.ui.components
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import com.bluepilot.remote.model.HapticIntensity
 
 /**
  * Shared building blocks for control screens.
- * Haptics honor the user's touch-vibrations setting via [hapticEnabled].
+ *
+ * SECTION 3B polish:
+ *  - [KeyCard] now animates a press-scale (spring) driven by the real
+ *    pressed interaction state — instant visual feedback on touch-down.
+ *  - Haptics honor BOTH the on/off setting and the intensity setting,
+ *    delivered app-wide through [LocalHapticIntensity] (no per-call-site
+ *    plumbing needed).
  */
 
-/** Performs a key-press haptic if enabled. */
+/** Active haptic intensity, provided at the app root. */
+val LocalHapticIntensity = staticCompositionLocalOf { HapticIntensity.MEDIUM }
+
+/**
+ * Returns a haptic trigger honoring the user's on/off + intensity settings.
+ * LIGHT  → subtle clock-tick, MEDIUM → keyboard tap, STRONG → long-press buzz.
+ */
 @Composable
 fun rememberHaptic(hapticEnabled: Boolean): () -> Unit {
     val view = LocalView.current
+    val intensity = LocalHapticIntensity.current
     return {
         if (hapticEnabled) {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            val constant = when (intensity) {
+                HapticIntensity.LIGHT -> HapticFeedbackConstants.CLOCK_TICK
+                HapticIntensity.MEDIUM -> HapticFeedbackConstants.KEYBOARD_TAP
+                HapticIntensity.STRONG -> HapticFeedbackConstants.LONG_PRESS
+            }
+            view.performHapticFeedback(constant)
         }
     }
 }
 
-/** A tappable key/button card used across keyboard/numpad/media screens. */
+/**
+ * A tappable key/button card used across keyboard/numpad/media screens.
+ * Press feedback: springy scale-down to 94% while touched (plus the
+ * default Material ripple). [height] is a minimum — cards stretch with
+ * weight()/fillMaxHeight() so no screen size clips them.
+ */
 @Composable
 fun KeyCard(
     label: String,
@@ -43,16 +78,33 @@ fun KeyCard(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 800f),
+        label = "keyPressScale"
+    )
+
     Card(
         modifier = modifier
-            .height(height)
-            .clickable(enabled = enabled, onClick = onClick),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .heightIn(min = height)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                enabled = enabled,
+                onClick = onClick
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (emphasized) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().heightIn(min = height), contentAlignment = Alignment.Center) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,

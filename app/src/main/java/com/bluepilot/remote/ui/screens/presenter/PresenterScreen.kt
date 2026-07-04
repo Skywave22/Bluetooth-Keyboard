@@ -45,6 +45,7 @@ fun PresenterScreen(
     val haptic = rememberHaptic(vibration)
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Presenter") },

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bluepilot.remote.data.macros.Macro
 import com.bluepilot.remote.data.macros.MacroRepository
 import com.bluepilot.remote.domain.MacroEngine
+import com.bluepilot.remote.domain.MacroRecorder
 import com.bluepilot.remote.domain.usecase.ObserveConnectionUseCase
 import com.bluepilot.remote.model.macros.MacroSpec
 import com.bluepilot.remote.model.macros.MacroStep
@@ -29,8 +30,13 @@ import javax.inject.Inject
 class MacrosViewModel @Inject constructor(
     private val repository: MacroRepository,
     private val engine: MacroEngine,
+    private val recorder: MacroRecorder,
     observeConnection: ObserveConnectionUseCase
 ) : ViewModel() {
+
+    /** Live recorder state for the REC banner. */
+    val isRecording = recorder.recording
+    val recordedSteps = recorder.stepCount
 
     val macros: StateFlow<List<Macro>> = repository.observeAll()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -49,6 +55,17 @@ class MacrosViewModel @Inject constructor(
 
     fun newMacro() {
         _draft.value = null to MacroSpec(name = "New macro")
+    }
+
+    /** SECTION 3A — Recorder: arm capture; user then plays any screen. */
+    fun startRecording() {
+        recorder.start()
+    }
+
+    /** Stop and open the captured sequence as an editable draft. */
+    fun stopRecording() {
+        val steps = recorder.stop()
+        _draft.value = null to MacroSpec(name = "Recorded macro", steps = steps)
     }
 
     fun edit(macro: Macro) {

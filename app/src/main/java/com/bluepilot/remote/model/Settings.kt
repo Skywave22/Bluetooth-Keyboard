@@ -10,12 +10,18 @@ package com.bluepilot.remote.model
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
+/** Haptic feedback strength (Section 3B polish). */
+enum class HapticIntensity { LIGHT, MEDIUM, STRONG }
+
 /** General app behavior. */
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** Active visual theme id from BuiltInThemes (Section 1 theme engine). */
+    val themeId: String = "pilot_dark",
     val fullscreenMode: Boolean = false,
     val keepScreenOn: Boolean = true,
     val touchVibrations: Boolean = true,
+    val hapticIntensity: HapticIntensity = HapticIntensity.MEDIUM,
     val secureScreen: Boolean = false
 )
 

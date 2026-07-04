@@ -49,6 +49,10 @@ interface WidgetEvents {
     fun onScrollDelta(dy: Float)
     fun onJoystick(x: Float, y: Float)                   // -1..1
     fun onDpad(dirX: Int, dirY: Int)                     // -1/0/1 each axis
+    /** GESTURE_ZONE: classified swipe released. */
+    fun onSwipe(widget: WidgetSpec, direction: com.bluepilot.remote.domain.SwipeDirection) {}
+    /** GESTURE_ZONE: two-finger tap (multi-touch gesture). */
+    fun onTwoFingerTap(widget: WidgetSpec) {}
 }
 
 /** Renders a full layout: canvas + all visible widgets at fractional frames. */
@@ -100,6 +104,7 @@ fun RenderWidget(
             WidgetType.JOYSTICK -> JoystickBody(events, fg)
             WidgetType.SLIDER -> SliderBody(widget, events, fg)
             WidgetType.DPAD -> DpadBody(events, fg)
+            WidgetType.GESTURE_ZONE -> GestureZoneBody(widget, events, fg)
         }
     }
 }
@@ -264,5 +269,61 @@ private fun DpadArrow(glyph: String, cell: Dp, fg: Color, onTap: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(glyph, color = fg)
+    }
+}
+
+/**
+ * SECTION 3A — Gesture zone.
+ * One finger: accumulate drag → classify swipe on release (up/down/left/right).
+ * Two fingers down together: two-finger tap. All bindable per direction.
+ */
+@Composable
+private fun GestureZoneBody(widget: WidgetSpec, events: WidgetEvents, fg: Color) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(widget.id + "-multitouch") {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val pressedCount = event.changes.count { it.pressed }
+                        if (pressedCount >= 2) {
+                            events.onTwoFingerTap(widget)
+                            // Swallow until all fingers lift (one fire per gesture).
+                            do {
+                                val e = awaitPointerEvent()
+                            } while (e.changes.any { it.pressed })
+                        }
+                    }
+                }
+            }
+            .pointerInput(widget.id + "-swipe") {
+                var totalX = 0f
+                var totalY = 0f
+                detectDragGestures(
+                    onDragStart = { totalX = 0f; totalY = 0f },
+                    onDragEnd = {
+                        val dir = com.bluepilot.remote.domain.SwipeGestures.classify(totalX, totalY)
+                        if (dir != com.bluepilot.remote.domain.SwipeDirection.NONE) {
+                            events.onSwipe(widget, dir)
+                        }
+                    }
+                ) { change, drag ->
+                    change.consume()
+                    totalX += drag.x
+                    totalY += drag.y
+                }
+            }
+            .pointerInput(widget.id + "-tap") {
+                detectTapGestures(onTap = { events.onPrimary(widget) })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        WidgetLabel(
+            widget.style.icon,
+            widget.style.label.ifBlank { "⇦⇧⇨⇩" },
+            widget.style.fontSize,
+            fg.copy(alpha = 0.55f)
+        )
     }
 }

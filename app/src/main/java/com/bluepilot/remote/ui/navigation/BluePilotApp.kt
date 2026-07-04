@@ -1,5 +1,10 @@
 package com.bluepilot.remote.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -11,6 +16,7 @@ import com.bluepilot.remote.ui.screens.devices.DevicesScreen
 import com.bluepilot.remote.ui.screens.home.HomeScreen
 import com.bluepilot.remote.ui.screens.permission.PermissionScreen
 import com.bluepilot.remote.ui.screens.gamepad.GamepadScreen
+import com.bluepilot.remote.ui.screens.gamepadbuilder.GamepadBuilderScreen
 import com.bluepilot.remote.ui.screens.help.HelpScreen
 import com.bluepilot.remote.ui.screens.keyboard.KeyboardScreen
 import com.bluepilot.remote.ui.screens.editor.LayoutEditorScreen
@@ -21,6 +27,7 @@ import com.bluepilot.remote.ui.screens.multimedia.MultimediaScreen
 import com.bluepilot.remote.ui.screens.numpad.NumpadScreen
 import com.bluepilot.remote.ui.screens.presenter.PresenterScreen
 import com.bluepilot.remote.ui.screens.settings.SettingsScreen
+import com.bluepilot.remote.ui.screens.themes.ThemeGalleryScreen
 
 /**
  * Central navigation graph.
@@ -48,15 +55,31 @@ object Routes {
     const val LAYOUT_EDITOR = "layout_editor"
     const val COMBO_PROFILES = "combo_profiles"
     const val MACROS = "macros"
+    const val THEMES = "themes"
+    const val GAMEPAD_BUILDER = "gamepad_builder"
 }
 
 @Composable
 fun BluePilotApp() {
     val navController = rememberNavController()
 
+    // SECTION 3B — smooth screen transitions: horizontal slide + fade,
+    // mirrored for back navigation. 260ms tween ≈ Material motion spec.
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME
+        startDestination = Routes.HOME,
+        enterTransition = {
+            slideInHorizontally(tween(260)) { it / 4 } + fadeIn(tween(260))
+        },
+        exitTransition = {
+            slideOutHorizontally(tween(260)) { -it / 4 } + fadeOut(tween(200))
+        },
+        popEnterTransition = {
+            slideInHorizontally(tween(260)) { -it / 4 } + fadeIn(tween(260))
+        },
+        popExitTransition = {
+            slideOutHorizontally(tween(260)) { it / 4 } + fadeOut(tween(200))
+        }
     ) {
         composable(Routes.HOME) {
             HomeScreen(
@@ -85,7 +108,8 @@ fun BluePilotApp() {
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenThemes = { navController.navigate(Routes.THEMES) }
             )
         }
         composable(Routes.MOUSE) { MouseScreen(onBack = { navController.popBackStack() }) }
@@ -102,6 +126,8 @@ fun BluePilotApp() {
             )
         }
         composable(Routes.MACROS) { MacrosScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.THEMES) { ThemeGalleryScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.GAMEPAD_BUILDER) { GamepadBuilderScreen(onBack = { navController.popBackStack() }) }
         composable(
             route = "${Routes.LAYOUT_EDITOR}/{profileId}",
             arguments = listOf(navArgument("profileId") { type = NavType.LongType })

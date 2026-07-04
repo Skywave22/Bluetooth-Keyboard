@@ -64,6 +64,7 @@ object LayoutEditorOps {
             WidgetType.JOYSTICK -> WidgetFrame(0.3f, 0.5f, 0.4f, 0.3f)
             WidgetType.SLIDER -> WidgetFrame(0.8f, 0.5f, 0.15f, 0.35f)
             WidgetType.DPAD -> WidgetFrame(0.3f, 0.55f, 0.4f, 0.35f)
+            WidgetType.GESTURE_ZONE -> WidgetFrame(0.15f, 0.15f, 0.7f, 0.4f)
         }
         val label = when (type) {
             WidgetType.BUTTON -> "Button"
@@ -72,6 +73,7 @@ object LayoutEditorOps {
             WidgetType.JOYSTICK -> ""
             WidgetType.SLIDER -> ""
             WidgetType.DPAD -> ""
+            WidgetType.GESTURE_ZONE -> "Swipe zone"
         }
         val widget = WidgetSpec(
             id = id,
@@ -110,7 +112,7 @@ object LayoutEditorOps {
     // ------------------------------------------------------------------
 
     /** How to split the canvas into zones. */
-    enum class ZoneSplit { HORIZONTAL_2, VERTICAL_2, GRID_2X2, TOP_BOTTOM_THIRDS }
+    enum class ZoneSplit { HORIZONTAL_2, VERTICAL_2, GRID_2X2, TOP_BOTTOM_THIRDS, QUARTER_MAIN, CORNER_ZONES }
 
     /** Fractional rectangles produced by a split (with a small gutter). */
     fun zoneFrames(split: ZoneSplit): List<WidgetFrame> {
@@ -133,6 +135,20 @@ object LayoutEditorOps {
             ZoneSplit.TOP_BOTTOM_THIRDS -> listOf(
                 WidgetFrame(g, g, 1f - 2 * g, 0.62f - 1.5f * g),
                 WidgetFrame(g, 0.62f + 0.5f * g, 1f - 2 * g, 0.38f - 1.5f * g)
+            )
+            // Quarter-main: big 3/4 main zone + right column split in two.
+            ZoneSplit.QUARTER_MAIN -> listOf(
+                WidgetFrame(g, g, 0.72f - 1.5f * g, 1f - 2 * g),
+                WidgetFrame(0.72f + 0.5f * g, g, 0.28f - 1.5f * g, 0.5f - g),
+                WidgetFrame(0.72f + 0.5f * g, 0.5f + 0.5f * g, 0.28f - 1.5f * g, 0.5f - 1.5f * g)
+            )
+            // Corner zones: 4 corner pads + center strip.
+            ZoneSplit.CORNER_ZONES -> listOf(
+                WidgetFrame(g, g, 0.30f, 0.30f),
+                WidgetFrame(0.68f, g, 0.30f, 0.30f),
+                WidgetFrame(g, 0.68f, 0.30f, 0.30f),
+                WidgetFrame(0.68f, 0.68f, 0.30f, 0.30f),
+                WidgetFrame(0.34f, 0.36f, 0.32f, 0.28f)
             )
         }
     }

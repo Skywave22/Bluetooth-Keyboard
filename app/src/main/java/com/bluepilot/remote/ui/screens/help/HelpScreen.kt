@@ -46,6 +46,7 @@ fun HelpScreen(onBack: () -> Unit) {
     )
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Help") },

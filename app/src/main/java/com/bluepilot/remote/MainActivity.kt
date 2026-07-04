@@ -14,8 +14,11 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.ThemeMode
+import com.bluepilot.remote.ui.components.LocalHapticIntensity
 import com.bluepilot.remote.ui.navigation.BluePilotApp
-import com.bluepilot.remote.ui.theme.BluePilotTheme
+import com.bluepilot.remote.ui.theme.BluePilotAppTheme
+import com.bluepilot.remote.ui.theme.BuiltInThemes
+import com.bluepilot.remote.ui.theme.ThemedBackground
 import com.bluepilot.remote.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -36,10 +39,21 @@ class MainActivity : ComponentActivity() {
             val settingsViewModel: SettingsViewModel = hiltViewModel()
             val app by settingsViewModel.app.collectAsState()
 
-            val darkTheme = when (app.theme) {
+            // Section 1 theme engine: resolve the active AppThemeSpec.
+            // Light/Dark/System mode maps onto the spec catalog: if the user
+            // forces LIGHT but picked a dark spec (or vice versa), we swap to
+            // the closest built-in of the requested brightness.
+            val systemDark = isSystemInDarkTheme()
+            val baseSpec = BuiltInThemes.byId(app.themeId)
+            val wantDark = when (app.theme) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.SYSTEM -> systemDark
+            }
+            val spec = when {
+                baseSpec.isDark == wantDark -> baseSpec
+                wantDark -> BuiltInThemes.PILOT_DARK
+                else -> BuiltInThemes.MINIMAL_LIGHT
             }
 
             // Apply window-level settings as side effects, restoring on change.
@@ -65,8 +79,14 @@ class MainActivity : ComponentActivity() {
                 onDispose { }
             }
 
-            BluePilotTheme(darkTheme = darkTheme) {
-                BluePilotApp()
+            BluePilotAppTheme(spec = spec) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalHapticIntensity provides app.hapticIntensity
+                ) {
+                    ThemedBackground {
+                        BluePilotApp()
+                    }
+                }
             }
         }
     }

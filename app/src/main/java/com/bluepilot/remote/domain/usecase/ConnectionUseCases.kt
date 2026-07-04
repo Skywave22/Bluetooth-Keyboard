@@ -63,7 +63,13 @@ class GetBondedDevicesUseCase @Inject constructor(
 
 /** Send any HID input action (keyboard/mouse/media/system/gamepad). */
 class SendHidActionUseCase @Inject constructor(
-    private val controller: HidController
+    private val controller: HidController,
+    private val recorder: com.bluepilot.remote.domain.MacroRecorder
 ) {
-    operator fun invoke(action: HidAction) = controller.send(action)
+    operator fun invoke(action: HidAction) {
+        // Macro recorder taps the pipeline: captures recordable actions
+        // from EVERY screen while armed; zero overhead when idle.
+        recorder.capture(action)
+        controller.send(action)
+    }
 }

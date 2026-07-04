@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.bluepilot.remote.domain.SettingsStore
 import com.bluepilot.remote.model.AppSettings
 import com.bluepilot.remote.model.GamepadMappingMode
+import com.bluepilot.remote.model.HapticIntensity
 import com.bluepilot.remote.model.GamepadSettings
 import com.bluepilot.remote.model.KeyboardSettings
 import com.bluepilot.remote.model.MouseSettings
@@ -45,9 +46,11 @@ class DataStoreSettings @Inject constructor(
     private object Keys {
         // App
         val THEME = stringPreferencesKey("theme")
+        val THEME_ID = stringPreferencesKey("theme_id")
         val FULLSCREEN = booleanPreferencesKey("fullscreen")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val VIBRATIONS = booleanPreferencesKey("vibrations")
+        val HAPTIC_INTENSITY = stringPreferencesKey("haptic_intensity")
         val SECURE_SCREEN = booleanPreferencesKey("secure_screen")
         // Mouse
         val M_SENSITIVITY = intPreferencesKey("m_sensitivity")
@@ -83,9 +86,11 @@ class DataStoreSettings @Inject constructor(
     override val appSettings: Flow<AppSettings> = safePrefs.map { p ->
         AppSettings(
             theme = p[Keys.THEME].toEnum(ThemeMode.SYSTEM),
+            themeId = p[Keys.THEME_ID] ?: "pilot_dark",
             fullscreenMode = p[Keys.FULLSCREEN] ?: false,
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: true,
             touchVibrations = p[Keys.VIBRATIONS] ?: true,
+            hapticIntensity = p[Keys.HAPTIC_INTENSITY].toEnum(HapticIntensity.MEDIUM),
             secureScreen = p[Keys.SECURE_SCREEN] ?: false
         )
     }
@@ -121,9 +126,11 @@ class DataStoreSettings @Inject constructor(
     override suspend fun updateApp(settings: AppSettings) {
         safeEdit { p ->
             p[Keys.THEME] = settings.theme.name
+            p[Keys.THEME_ID] = settings.themeId
             p[Keys.FULLSCREEN] = settings.fullscreenMode
             p[Keys.KEEP_SCREEN_ON] = settings.keepScreenOn
             p[Keys.VIBRATIONS] = settings.touchVibrations
+            p[Keys.HAPTIC_INTENSITY] = settings.hapticIntensity.name
             p[Keys.SECURE_SCREEN] = settings.secureScreen
         }
     }

@@ -47,7 +47,7 @@ fun PermissionScreen(
         if (granted) onGranted()
     }
 
-    Scaffold { padding ->
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -32,7 +32,9 @@ enum class WidgetType {
     /** Vertical slider firing primary action on up-steps, secondary on down. */
     SLIDER,
     /** 4-way arrow pad (up/down/left/right arrow keys or bound actions). */
-    DPAD
+    DPAD,
+    /** Swipe-gesture zone: 4 directions + two-finger tap, each bindable. */
+    GESTURE_ZONE
 }
 
 // ----------------------------------------------------------------------
@@ -151,7 +153,13 @@ data class WidgetSpec(
     /** Primary binding (tap / slider-up / dpad-up depending on type). */
     val action: WidgetAction = WidgetAction.None,
     /** Secondary binding (slider-down / dpad-down). */
-    val secondaryAction: WidgetAction = WidgetAction.None
+    val secondaryAction: WidgetAction = WidgetAction.None,
+    /** GESTURE_ZONE bindings — one per swipe direction + two-finger tap. */
+    val swipeUp: WidgetAction = WidgetAction.None,
+    val swipeDown: WidgetAction = WidgetAction.None,
+    val swipeLeft: WidgetAction = WidgetAction.None,
+    val swipeRight: WidgetAction = WidgetAction.None,
+    val twoFingerTap: WidgetAction = WidgetAction.None
 ) {
     fun sanitized(): WidgetSpec = copy(
         frame = frame.sanitized(),

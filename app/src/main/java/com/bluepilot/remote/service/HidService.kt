@@ -20,7 +20,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import timber.log.Timber
 import javax.inject.Inject
@@ -64,8 +66,13 @@ class HidService : Service() {
         // Foreground immediately — required within 5s of startForegroundService().
         startInForeground(buildNotification("Starting…"))
         // Keep the notification in sync with the connection state machine.
+        // Battery: map to label first + distinctUntilChanged — the
+        // NotificationManager is only touched when the visible text actually
+        // changes (state spam like repeated Idle costs zero wakeups).
         hidController.state
-            .onEach { state -> updateNotification(stateLabel(state)) }
+            .map { stateLabel(it) }
+            .distinctUntilChanged()
+            .onEach { label -> updateNotification(label) }
             .launchIn(serviceScope)
         Timber.i("HidService created")
     }

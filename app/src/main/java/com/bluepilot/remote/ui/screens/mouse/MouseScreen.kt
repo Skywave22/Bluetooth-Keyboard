@@ -54,6 +54,7 @@ fun MouseScreen(
     val haptic = rememberHaptic(vibration)
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Mouse") },
@@ -90,7 +91,9 @@ fun MouseScreen(
                                 onLongPress = { haptic(); viewModel.onTrackpadLongPress() }
                             )
                         }
-                        .pointerInput(Unit) {
+                        .pointerInput(viewModel) {
+                            // keyed on viewModel (stable): gesture coroutine
+                            // survives recompositions -> no dropped deltas.
                             detectDragGestures(
                                 onDragStart = { viewModel.onTrackpadGestureStart() }
                             ) { change, dragAmount ->
@@ -119,7 +122,7 @@ fun MouseScreen(
                             MaterialTheme.colorScheme.surfaceVariant,
                             RoundedCornerShape(16.dp)
                         )
-                        .pointerInput(Unit) {
+                        .pointerInput(viewModel) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
                                 viewModel.onScrollDelta(dragAmount.y)

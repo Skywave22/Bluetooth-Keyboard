@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,6 +50,7 @@ fun NumpadScreen(
     )
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Numpad") },
@@ -76,10 +78,11 @@ fun NumpadScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     row.forEach { (label, key) ->
+                        // fillMaxHeight: keys scale with the weighted row, so
+                        // the grid never overflows on small screens.
                         KeyCard(
                             label = label,
-                            modifier = Modifier.weight(1f),
-                            height = 72.dp,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             emphasized = label == "Enter"
                         ) { haptic(); viewModel.keyTap(key) }
                     }

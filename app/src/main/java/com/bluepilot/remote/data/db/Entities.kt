@@ -55,3 +55,16 @@ data class SkinEntity(
     val valuesJson: String,
     val isBuiltIn: Boolean = false
 )
+
+/**
+ * A custom gamepad profile (Section 2 builder).
+ * `layoutJson` holds a serialized GamepadLayoutSpec.
+ */
+@Entity(tableName = "gamepad_profiles")
+data class GamepadProfileEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val layoutJson: String,
+    val isBuiltIn: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
+)

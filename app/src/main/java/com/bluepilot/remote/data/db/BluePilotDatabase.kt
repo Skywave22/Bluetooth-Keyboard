@@ -13,13 +13,15 @@ import androidx.room.RoomDatabase
     entities = [
         LayoutProfileEntity::class,
         MacroEntity::class,
-        SkinEntity::class
+        SkinEntity::class,
+        GamepadProfileEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BluePilotDatabase : RoomDatabase() {
     abstract fun layoutProfileDao(): LayoutProfileDao
     abstract fun macroDao(): MacroDao
     abstract fun skinDao(): SkinDao
+    abstract fun gamepadProfileDao(): GamepadProfileDao
 }

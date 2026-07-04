@@ -123,6 +123,30 @@ fun WidgetStylePanel(viewModel: LayoutEditorViewModel) {
         PanelSection("Long-press action")
         ActionPicker(current = widget.secondaryAction, macros = macros) { viewModel.setSelectedSecondaryAction(it) }
 
+        // GESTURE_ZONE: per-direction swipe + two-finger-tap bindings.
+        if (widget.type == com.bluepilot.remote.model.widgets.WidgetType.GESTURE_ZONE) {
+            PanelSection("Swipe up")
+            ActionPicker(current = widget.swipeUp, macros = macros) {
+                viewModel.setSelectedGestureAction(com.bluepilot.remote.viewmodel.LayoutEditorViewModel.GestureSlot.UP, it)
+            }
+            PanelSection("Swipe down")
+            ActionPicker(current = widget.swipeDown, macros = macros) {
+                viewModel.setSelectedGestureAction(com.bluepilot.remote.viewmodel.LayoutEditorViewModel.GestureSlot.DOWN, it)
+            }
+            PanelSection("Swipe left")
+            ActionPicker(current = widget.swipeLeft, macros = macros) {
+                viewModel.setSelectedGestureAction(com.bluepilot.remote.viewmodel.LayoutEditorViewModel.GestureSlot.LEFT, it)
+            }
+            PanelSection("Swipe right")
+            ActionPicker(current = widget.swipeRight, macros = macros) {
+                viewModel.setSelectedGestureAction(com.bluepilot.remote.viewmodel.LayoutEditorViewModel.GestureSlot.RIGHT, it)
+            }
+            PanelSection("Two-finger tap")
+            ActionPicker(current = widget.twoFingerTap, macros = macros) {
+                viewModel.setSelectedGestureAction(com.bluepilot.remote.viewmodel.LayoutEditorViewModel.GestureSlot.TWO_FINGER, it)
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
     }
 }

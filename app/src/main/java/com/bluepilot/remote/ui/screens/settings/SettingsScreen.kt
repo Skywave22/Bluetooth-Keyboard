@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.GamepadMappingMode
+import com.bluepilot.remote.model.HapticIntensity
 import com.bluepilot.remote.model.ThemeMode
 import com.bluepilot.remote.viewmodel.SettingsViewModel
 
@@ -44,6 +45,7 @@ import com.bluepilot.remote.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenThemes: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val app by viewModel.app.collectAsState()
@@ -52,6 +54,7 @@ fun SettingsScreen(
     val gamepad by viewModel.gamepad.collectAsState()
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -72,6 +75,11 @@ fun SettingsScreen(
         ) {
             // ---------- General ----------
             SettingsGroup("General") {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenThemes,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Open theme gallery") }
+                Spacer(Modifier.height(8.dp))
                 Text("Theme", style = MaterialTheme.typography.bodyMedium)
                 Row(modifier = Modifier.padding(vertical = 4.dp)) {
                     ThemeMode.entries.forEach { mode ->
@@ -86,6 +94,19 @@ fun SettingsScreen(
                 ToggleRow("Fullscreen mode", app.fullscreenMode, viewModel::setFullscreen)
                 ToggleRow("Keep screen on", app.keepScreenOn, viewModel::setKeepScreenOn)
                 ToggleRow("Touch vibrations", app.touchVibrations, viewModel::setTouchVibrations)
+                if (app.touchVibrations) {
+                    Text("Vibration strength", style = MaterialTheme.typography.bodyMedium)
+                    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                        HapticIntensity.entries.forEach { level ->
+                            FilterChip(
+                                selected = app.hapticIntensity == level,
+                                onClick = { viewModel.setHapticIntensity(level) },
+                                label = { Text(level.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+                    }
+                }
                 ToggleRow(
                     "Secure screen",
                     app.secureScreen,

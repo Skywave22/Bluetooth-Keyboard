@@ -73,8 +73,11 @@ fun MacrosScreen(
 
     val macros by viewModel.macros.collectAsState()
     val isConnected by viewModel.isConnected.collectAsState()
+    val isRecording by viewModel.isRecording.collectAsState()
+    val recordedSteps by viewModel.recordedSteps.collectAsState()
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Macros") },
@@ -88,6 +91,49 @@ fun MacrosScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = { viewModel.newMacro() }) {
                 Icon(Icons.Rounded.Add, contentDescription = "New macro")
+            }
+        },
+        bottomBar = {
+            // SECTION 3A — Recorder bar: arm → use ANY control screen
+            // (keyboard/media/mouse clicks are captured) → stop = draft.
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isRecording) MaterialTheme.colorScheme.errorContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (isRecording) "● REC — $recordedSteps steps captured"
+                            else "Macro recorder",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (isRecording) MaterialTheme.colorScheme.onErrorContainer
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            if (isRecording) "Go use Keyboard/Media/Mouse — then come back and stop."
+                            else "Record real inputs from any screen, replay with one tap.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (isRecording) {
+                        androidx.compose.material3.Button(onClick = { viewModel.stopRecording() }) {
+                            Text("Stop")
+                        }
+                    } else {
+                        androidx.compose.material3.OutlinedButton(onClick = { viewModel.startRecording() }) {
+                            Text("● Record")
+                        }
+                    }
+                }
             }
         }
     ) { padding ->
@@ -155,6 +201,7 @@ private fun MacroEditor(viewModel: MacrosViewModel) {
     var textInput by remember { mutableStateOf("") }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(if (rowId == null) "New macro" else "Edit macro") },

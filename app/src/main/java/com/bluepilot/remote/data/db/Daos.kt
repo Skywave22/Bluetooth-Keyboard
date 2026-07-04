@@ -58,3 +58,21 @@ interface SkinDao {
     @Query("DELETE FROM skins WHERE id = :id AND isBuiltIn = 0")
     suspend fun deleteById(id: Long)
 }
+
+@Dao
+interface GamepadProfileDao {
+    @Query("SELECT * FROM gamepad_profiles ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<GamepadProfileEntity>>
+
+    @Query("SELECT * FROM gamepad_profiles WHERE id = :id")
+    suspend fun byId(id: Long): GamepadProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(profile: GamepadProfileEntity): Long
+
+    @Query("DELETE FROM gamepad_profiles WHERE id = :id AND isBuiltIn = 0")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT COUNT(*) FROM gamepad_profiles")
+    suspend fun count(): Int
+}

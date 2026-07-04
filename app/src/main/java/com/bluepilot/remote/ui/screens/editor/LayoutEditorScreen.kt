@@ -81,6 +81,7 @@ fun LayoutEditorScreen(
     var showStyleSheet by remember { mutableStateOf(false) }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(layout.name + if (dirty) " •" else "") },
@@ -168,6 +169,28 @@ fun LayoutEditorScreen(
                             },
                             label = { Text("Grid 2×2") }
                         )
+                        AssistChip(
+                            onClick = {
+                                viewModel.applyZoneSplit(
+                                    LayoutEditorOps.ZoneSplit.QUARTER_MAIN,
+                                    listOf(WidgetType.TRACKPAD, WidgetType.SLIDER, WidgetType.BUTTON)
+                                )
+                            },
+                            label = { Text("¾ + column") }
+                        )
+                        AssistChip(
+                            onClick = {
+                                viewModel.applyZoneSplit(
+                                    LayoutEditorOps.ZoneSplit.CORNER_ZONES,
+                                    listOf(
+                                        WidgetType.BUTTON, WidgetType.BUTTON,
+                                        WidgetType.BUTTON, WidgetType.BUTTON,
+                                        WidgetType.GESTURE_ZONE
+                                    )
+                                )
+                            },
+                            label = { Text("Corners") }
+                        )
                     } else {
                         AssistChip(onClick = { showStyleSheet = true }, label = { Text("Style & action") })
                         AssistChip(
@@ -212,7 +235,8 @@ private val paletteEntries = listOf(
     "Scroll" to WidgetType.SCROLL_STRIP,
     "Joystick" to WidgetType.JOYSTICK,
     "Slider" to WidgetType.SLIDER,
-    "D-pad" to WidgetType.DPAD
+    "D-pad" to WidgetType.DPAD,
+    "Gestures" to WidgetType.GESTURE_ZONE
 )
 
 // ----------------------------------------------------------------------
@@ -254,6 +278,12 @@ private fun EditorCanvas(
                 override fun onScrollDelta(dy: Float) { if (previewMode) viewModel.interactor.scrollDelta(dy) }
                 override fun onJoystick(x: Float, y: Float) { if (previewMode) viewModel.interactor.joystick(x, y) }
                 override fun onDpad(dirX: Int, dirY: Int) { if (previewMode) viewModel.interactor.dpad(dirX, dirY) }
+                override fun onSwipe(widget: WidgetSpec, direction: com.bluepilot.remote.domain.SwipeDirection) {
+                    if (previewMode) viewModel.interactor.swipe(widget, direction)
+                }
+                override fun onTwoFingerTap(widget: WidgetSpec) {
+                    if (previewMode) viewModel.interactor.twoFingerTap(widget)
+                }
             }
         }
 

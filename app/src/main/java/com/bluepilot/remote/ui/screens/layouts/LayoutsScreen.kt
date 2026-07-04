@@ -123,6 +123,7 @@ fun LayoutsScreen(
         // so it never fights trackpad/joystick gestures on the canvas).
         val swipeAccum = remember { floatArrayOf(0f) }
         Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
             topBar = {
                 TopAppBar(
                     title = { Text(activeProfile.spec.name) },
@@ -158,9 +159,10 @@ fun LayoutsScreen(
         ) { padding ->
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(8.dp)) {
                 NotConnectedBanner(!isConnected)
-                LayoutCanvas(
-                    layout = activeProfile.spec,
-                    events = object : WidgetEvents {
+                // Perf: remember(viewModel) — stable events object, so
+                // LayoutCanvas skips recomposition of unchanged widgets.
+                val canvasEvents = remember(viewModel) {
+                    object : WidgetEvents {
                         override fun onPrimary(widget: WidgetSpec) = viewModel.interactor.primary(widget)
                         override fun onSecondary(widget: WidgetSpec) = viewModel.interactor.secondary(widget)
                         override fun onTrackpadStart() = viewModel.interactor.trackpadStart()
@@ -168,7 +170,15 @@ fun LayoutsScreen(
                         override fun onScrollDelta(dy: Float) = viewModel.interactor.scrollDelta(dy)
                         override fun onJoystick(x: Float, y: Float) = viewModel.interactor.joystick(x, y)
                         override fun onDpad(dirX: Int, dirY: Int) = viewModel.interactor.dpad(dirX, dirY)
-                    },
+                        override fun onSwipe(widget: WidgetSpec, direction: com.bluepilot.remote.domain.SwipeDirection) =
+                            viewModel.interactor.swipe(widget, direction)
+                        override fun onTwoFingerTap(widget: WidgetSpec) =
+                            viewModel.interactor.twoFingerTap(widget)
+                    }
+                }
+                LayoutCanvas(
+                    layout = activeProfile.spec,
+                    events = canvasEvents,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -178,6 +188,7 @@ fun LayoutsScreen(
 
     // ---------------- Profile list ----------------
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
