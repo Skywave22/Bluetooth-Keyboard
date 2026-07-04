@@ -16,8 +16,8 @@ android {
         applicationId = "com.bluepilot.remote"
         minSdk = 29          // Android 10+ (BluetoothHidDevice API requires 28; 29 confirmed by product decision)
         targetSdk = 34
-        versionCode = 300
-        versionName = "3.0.0"
+        versionCode = 310
+        versionName = "3.1.0"
 
         testInstrumentationRunner = "com.bluepilot.remote.HiltTestRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -55,8 +55,9 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Performance: R8 shrink/optimize/obfuscate + drop unused resources.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -1,20 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- BluePilot launcher glyph: stylized Bluetooth rune inside a pilot-wing shape. -->
+<!--
+  BluePilot launcher glyph (release icon):
+  glowing Bluetooth rune inside a soft blue orb with pilot-wing accents.
+  Pure vector -> crisp at every density; adaptive + monochrome (themed icons).
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:scaleX="0.5" android:scaleY="0.5" android:translateX="27" android:translateY="27">
+    <group android:scaleX="0.62" android:scaleY="0.62" android:translateX="20.5" android:translateY="20.5">
+        <!-- Outer glow ring -->
+        <path
+            android:fillColor="#1E2F63"
+            android:pathData="M54,6 C80.5,6 102,27.5 102,54 C102,80.5 80.5,102 54,102 C27.5,102 6,80.5 6,54 C6,27.5 27.5,6 54,6 Z" />
+        <!-- Main orb -->
         <path
             android:fillColor="#2F6BFF"
-            android:pathData="M54,10 C78.3,10 98,29.7 98,54 C98,78.3 78.3,98 54,98 C29.7,98 10,78.3 10,54 C10,29.7 29.7,10 54,10 Z" />
+            android:pathData="M54,12 C77.2,12 96,30.8 96,54 C96,77.2 77.2,96 54,96 C30.8,96 12,77.2 12,54 C12,30.8 30.8,12 54,12 Z" />
+        <!-- Inner highlight -->
+        <path
+            android:fillColor="#4D8DFF"
+            android:pathData="M54,16 C64,16 73,20 79.5,26.5 C70,22 60,20 50,22 C36,25 26,36 24,50 C22,38 27,27 36,20.5 C41.5,17.5 47.5,16 54,16 Z" />
+        <!-- Pilot wings -->
+        <path
+            android:fillColor="#A8C6FF"
+            android:pathData="M14,54 L30,48 L30,60 Z" />
+        <path
+            android:fillColor="#A8C6FF"
+            android:pathData="M94,54 L78,48 L78,60 Z" />
+        <!-- Bluetooth rune -->
         <path
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="6"
+            android:strokeWidth="7"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
             android:fillColor="#00000000"
-            android:pathData="M38,38 L70,66 L54,78 L54,30 L70,42 L38,70" />
+            android:pathData="M40,38 L68,66 L54,78 L54,30 L68,42 L40,70" />
     </group>
 </vector>
