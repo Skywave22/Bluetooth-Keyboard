@@ -1,6 +1,5 @@
 package com.bluepilot.remote.ui.components
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -58,13 +56,12 @@ fun GlassCard(
         )
     )
 
-    val blurModifier = if (Build.VERSION.SDK_INT >= 31 && surfaceAlpha < 1f) {
-        Modifier.blur(16.dp)
-    } else Modifier
-
+    // NOTE: no Modifier.blur() here — Compose's blur() blurs the card's
+    // CONTENT (children), not the backdrop behind it. Applying it made the
+    // whole Themes screen (and any GlassCard content) an unreadable fog on
+    // Android 12+. The frosted look comes from translucency + sheen alone.
     Box(
         modifier = modifier
-            .then(blurModifier)
             .background(surfaceColor, shape)
             .background(sheenBrush, shape)
             .border(borderWidth, borderBrush, shape)

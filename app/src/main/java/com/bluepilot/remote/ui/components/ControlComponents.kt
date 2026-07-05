@@ -3,9 +3,6 @@ package com.bluepilot.remote.ui.components
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -147,7 +144,14 @@ fun KeyCard(
             )
         }
     } else {
-        // Flat/Default look
+        // Solid look — real 3D key: gradient fake-lighting (top-left light
+        // source) + dynamic shadow that collapses while pressed. This
+        // replaces the old elevated Card, whose shadow bled through
+        // translucent container colors and painted a dark "box inside a
+        // box" on emphasized keys (ENTER / LEFT CLICK screenshot bug).
+        val base = if (emphasized) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceVariant
+
         val edgeModifier = if (spec.edgeGlow) {
             Modifier.border(
                 width = 1.dp,
@@ -156,26 +160,24 @@ fun KeyCard(
             )
         } else Modifier
 
-        Card(
-            shape = shape,
-            modifier = baseModifier.then(edgeModifier),
-            // SECTION 3D: dynamic shadow — collapses while pressed
-            // (light-source simulation paired with the press-depth tilt).
-            elevation = CardDefaults.cardElevation(defaultElevation = elevation.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (emphasized) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Box(modifier = Modifier.fillMaxSize().heightIn(min = height), contentAlignment = Alignment.Center) {
-                Text(
-                    text = finalLabel,
-                    style = labelStyle,
-                    color = contentColor,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+        Box(
+            modifier = baseModifier
+                .surface3D(
+                    base = base,
+                    shape = shape,
+                    material = Material3D.GLOSSY,
+                    elevation = elevation.dp
                 )
-            }
+                .then(edgeModifier),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = finalLabel,
+                style = labelStyle,
+                color = contentColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
     }
 }
