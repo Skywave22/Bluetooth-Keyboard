@@ -23,8 +23,22 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val store: SettingsStore
+    private val store: SettingsStore,
+    private val haptics: com.bluepilot.remote.haptics.Haptics
 ) : ViewModel() {
+
+    init {
+        // SECTION 8 — keep the engine's global intensity in sync.
+        viewModelScope.launch {
+            store.appSettings.collect { s ->
+                haptics.intensityScale = when (s.hapticIntensity) {
+                    HapticIntensity.LIGHT -> 0.25f
+                    HapticIntensity.MEDIUM -> 0.6f
+                    HapticIntensity.STRONG -> 1.0f
+                }
+            }
+        }
+    }
 
     val app: StateFlow<AppSettings> = store.appSettings
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
@@ -41,11 +55,14 @@ class SettingsViewModel @Inject constructor(
     // ----- App -----
     fun setTheme(theme: ThemeMode) = updateApp { it.copy(theme = theme) }
     fun setThemeId(id: String) = updateApp { it.copy(themeId = id) }
+        .also { haptics.play(com.bluepilot.remote.model.gamepad.HapticPattern.MEDIUM_CLICK) }
     fun setFullscreen(value: Boolean) = updateApp { it.copy(fullscreenMode = value) }
     fun setKeepScreenOn(value: Boolean) = updateApp { it.copy(keepScreenOn = value) }
     fun setTouchVibrations(value: Boolean) = updateApp { it.copy(touchVibrations = value) }
     fun setHapticIntensity(value: HapticIntensity) = updateApp { it.copy(hapticIntensity = value) }
     fun setSecureScreen(value: Boolean) = updateApp { it.copy(secureScreen = value) }
+    fun setOnboardingDone() = updateApp { it.copy(onboardingDone = true) }
+    fun setReduceMotion(value: Boolean) = updateApp { it.copy(reduceMotion = value) }
 
     // ----- Mouse -----
     fun setMouseSensitivity(value: Int) = updateMouse { it.copy(sensitivity = value) }

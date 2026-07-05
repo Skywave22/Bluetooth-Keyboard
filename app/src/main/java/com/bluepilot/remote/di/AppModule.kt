@@ -31,4 +31,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindNearbyScanner(impl: BluetoothDeviceScanner): NearbyScanner
+
+    @Binds
+    @Singleton
+    abstract fun bindHaptics(
+        impl: com.bluepilot.remote.haptics.HapticEngine
+    ): com.bluepilot.remote.haptics.Haptics
 }

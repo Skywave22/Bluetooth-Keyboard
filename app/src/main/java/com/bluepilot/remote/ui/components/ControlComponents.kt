@@ -1,10 +1,7 @@
 package com.bluepilot.remote.ui.components
 
 import android.view.HapticFeedbackConstants
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,12 +14,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -84,12 +79,9 @@ fun KeyCard(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 800f),
-        label = "keyPressScale"
-    )
+    // SECTION 3D: true press-depth — key tips back and sinks in, and its
+    // shadow collapses (light-source simulation). Honors Reduce Motion.
+    val elevation = pressedElevation(interactionSource, idle = 6f, pressed = 1f)
     val spec = LocalAppTheme.current
     val shape = MaterialTheme.shapes.medium
 
@@ -108,10 +100,7 @@ fun KeyCard(
     }
 
     val baseModifier = modifier
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
+        .pressDepth3D(interactionSource)
         .heightIn(min = height)
         .clickable(
             interactionSource = interactionSource,
@@ -170,6 +159,9 @@ fun KeyCard(
         Card(
             shape = shape,
             modifier = baseModifier.then(edgeModifier),
+            // SECTION 3D: dynamic shadow — collapses while pressed
+            // (light-source simulation paired with the press-depth tilt).
+            elevation = CardDefaults.cardElevation(defaultElevation = elevation.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (emphasized) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant

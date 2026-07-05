@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -109,9 +110,27 @@ private fun PressableControl(
     var pressed by remember { mutableStateOf(false) }
     val shape = controlShape(control.shape)
     val base = controlColor(control)
+    // SECTION 3D — raised button look: sits proud (slight highlight), and on
+    // press sinks + tips back. State-driven graphicsLayer: applied on the
+    // already-tracked `pressed` flag, so the input path gains ZERO latency.
+    val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                // Sink + tip-back on press; collapses to plain scale under
+                // Reduce Motion. Pure GPU transform, no latency added.
+                if (pressed) {
+                    if (reduceMotion) {
+                        scaleX = 0.96f; scaleY = 0.96f
+                    } else {
+                        cameraDistance = 8f * density
+                        rotationX = -5f
+                        scaleX = 0.94f; scaleY = 0.94f
+                        translationY = size.height * 0.02f
+                    }
+                }
+            }
             .background(if (pressed) base.copy(alpha = 1f) else base, shape)
             .pointerInput(control.id) {
                 awaitPointerEventScope {

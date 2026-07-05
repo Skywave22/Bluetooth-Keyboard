@@ -22,7 +22,11 @@ data class AppSettings(
     val keepScreenOn: Boolean = true,
     val touchVibrations: Boolean = true,
     val hapticIntensity: HapticIntensity = HapticIntensity.MEDIUM,
-    val secureScreen: Boolean = false
+    val secureScreen: Boolean = false,
+    /** First-run onboarding shown & dismissed (UI/UX redesign). */
+    val onboardingDone: Boolean = false,
+    /** Disable 3D tilts/parallax/flip transitions (accessibility/battery). */
+    val reduceMotion: Boolean = false
 )
 
 /** Mouse/trackpad tuning. All percentages 0..100. */

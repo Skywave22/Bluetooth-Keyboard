@@ -73,7 +73,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.gamepad.ControlShape
+import com.bluepilot.remote.model.gamepad.ButtonNaming
 import com.bluepilot.remote.model.gamepad.GamepadButtonNames
+import com.bluepilot.remote.model.gamepad.HapticPattern
+import com.bluepilot.remote.model.gamepad.ResponseCurve
 import com.bluepilot.remote.model.gamepad.GamepadControlSpec
 import com.bluepilot.remote.model.gamepad.GamepadControlType
 import com.bluepilot.remote.model.gamepad.StickSide
@@ -232,6 +235,9 @@ private fun ProfileList(onBack: () -> Unit, viewModel: GamepadBuilderViewModel) 
 private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
     val playing by viewModel.playing.collectAsState()
     val isConnected by viewModel.isConnected.collectAsState()
+    val motionEnabled by viewModel.motionEnabled.collectAsState()
+    val motionSensitivity by viewModel.motionSensitivity.collectAsState()
+    val motionDeadZone by viewModel.motionDeadZone.collectAsState()
     val profile = playing ?: return
 
     // BUG FIX: if the user leaves via system back (route pop), the composable
@@ -265,6 +271,20 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
                     }
                 },
                 actions = {
+                    // SECTION 7 — motion controls (gyro aim on right stick)
+                    if (viewModel.hasGyro) {
+                        FilterChip(
+                            selected = motionEnabled,
+                            onClick = { viewModel.setMotionEnabled(!motionEnabled) },
+                            label = { Text(if (motionEnabled) "Motion ON" else "Motion") }
+                        )
+                        if (motionEnabled) {
+                            AssistChip(
+                                onClick = { viewModel.recenterMotion() },
+                                label = { Text("⊕") }
+                            )
+                        }
+                    }
                     // Quick-switch between saved gamepad profiles.
                     IconButton(onClick = { viewModel.playNext(-1) }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Previous profile")
@@ -278,6 +298,28 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(8.dp)) {
             NotConnectedBanner(!isConnected)
+            if (motionEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Aim", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = motionSensitivity.toFloat(),
+                        onValueChange = { viewModel.setMotionSensitivity(it.toInt()) },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("DZ", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = motionDeadZone.toFloat(),
+                        onValueChange = { viewModel.setMotionDeadZone(it.toInt()) },
+                        valueRange = 0f..50f,
+                        modifier = Modifier.weight(0.6f)
+                    )
+                }
+            }
             GamepadCanvas(
                 layout = profile.spec,
                 events = events,
@@ -521,6 +563,22 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
             Spacer(Modifier.height(10.dp))
 
             // HID button binding
+            // SECTION 5 — naming convention toggle (Xbox / PlayStation)
+            val naming = draft?.second?.naming ?: ButtonNaming.XBOX
+            Text("Button naming", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = naming == ButtonNaming.XBOX,
+                    onClick = { viewModel.setNaming(ButtonNaming.XBOX) },
+                    label = { Text("A/B/X/Y") }
+                )
+                FilterChip(
+                    selected = naming == ButtonNaming.PLAYSTATION,
+                    onClick = { viewModel.setNaming(ButtonNaming.PLAYSTATION) },
+                    label = { Text("✕/○/□/△") }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             Text("Sends HID button", style = MaterialTheme.typography.bodyMedium)
             Row(
                 modifier = Modifier
@@ -532,7 +590,45 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                     FilterChip(
                         selected = control.buttonIndex == index,
                         onClick = { viewModel.updateSelected { it.copy(buttonIndex = index) } },
-                        label = { Text(GamepadButtonNames.label(index)) }
+                        label = { Text(GamepadButtonNames.label(index, naming)) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // SECTION 5 — turbo / rapid fire
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Turbo (rapid fire)", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.turbo,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(turbo = v) } }
+                )
+            }
+            if (control.turbo) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Rate", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("${control.turboRate}/s", color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                Slider(
+                    value = control.turboRate.toFloat(),
+                    onValueChange = { v -> viewModel.updateSelected(withUndo = false) { it.copy(turboRate = v.toInt()) } },
+                    valueRange = 2f..20f
+                )
+            }
+            // SECTION 8 — per-control haptic pattern
+            Text("Haptic on press", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                HapticPattern.entries.forEach { hp ->
+                    FilterChip(
+                        selected = control.haptic == hp,
+                        onClick = { viewModel.updateSelected { it.copy(haptic = hp) } },
+                        label = { Text(hp.name.lowercase().replace("_", " ")) }
                     )
                 }
             }
@@ -553,6 +649,29 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
 
         // Stick options
         if (control.type == GamepadControlType.STICK) {
+            // SECTION 5 — response curve (linear / expo / aggressive)
+            Text("Response curve", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ResponseCurve.entries.forEach { c ->
+                    FilterChip(
+                        selected = control.curve == c,
+                        onClick = { viewModel.updateSelected { it.copy(curve = c) } },
+                        label = { Text(c.name.lowercase().replaceFirstChar { ch -> ch.uppercase() }) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            // Per-profile stick sensitivity preset
+            val sens = draft?.second?.stickSensitivity ?: 70
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("Profile stick sensitivity", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text("$sens%", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+            }
+            Slider(
+                value = sens.toFloat(),
+                onValueChange = { v -> viewModel.setStickSensitivity(v.toInt()) },
+                valueRange = 0f..100f
+            )
             Text("Axis pair", style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StickSide.entries.forEach { side ->

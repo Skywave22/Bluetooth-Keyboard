@@ -52,6 +52,8 @@ class DataStoreSettings @Inject constructor(
         val VIBRATIONS = booleanPreferencesKey("vibrations")
         val HAPTIC_INTENSITY = stringPreferencesKey("haptic_intensity")
         val SECURE_SCREEN = booleanPreferencesKey("secure_screen")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
         // Mouse
         val M_SENSITIVITY = intPreferencesKey("m_sensitivity")
         val M_SCROLL = intPreferencesKey("m_scroll")
@@ -91,7 +93,9 @@ class DataStoreSettings @Inject constructor(
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: true,
             touchVibrations = p[Keys.VIBRATIONS] ?: true,
             hapticIntensity = p[Keys.HAPTIC_INTENSITY].toEnum(HapticIntensity.MEDIUM),
-            secureScreen = p[Keys.SECURE_SCREEN] ?: false
+            secureScreen = p[Keys.SECURE_SCREEN] ?: false,
+            onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
+            reduceMotion = p[Keys.REDUCE_MOTION] ?: false
         )
     }
 
@@ -132,6 +136,8 @@ class DataStoreSettings @Inject constructor(
             p[Keys.VIBRATIONS] = settings.touchVibrations
             p[Keys.HAPTIC_INTENSITY] = settings.hapticIntensity.name
             p[Keys.SECURE_SCREEN] = settings.secureScreen
+            p[Keys.ONBOARDING_DONE] = settings.onboardingDone
+            p[Keys.REDUCE_MOTION] = settings.reduceMotion
         }
     }
 

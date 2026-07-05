@@ -8,8 +8,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -117,22 +124,45 @@ fun ThemedBackground(
     content: @Composable () -> Unit
 ) {
     val spec = LocalAppTheme.current
+    val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current
+
+    // SECTION 3D — parallax depth: orbs drift slowly on offset phases so
+    // background layers feel separated. Draw-phase only (reading the
+    // animated value inside Canvas), zero recomposition per frame.
+    val drift = rememberInfiniteTransition(label = "orbDrift")
+    val phase by drift.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(durationMillis = 26_000, easing = LinearEasing),
+            RepeatMode.Restart
+        ),
+        label = "orbPhase"
+    )
+
     Box(modifier = modifier.fillMaxSize().background(spec.background)) {
         if (spec.backgroundOrbs.isNotEmpty()) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val maxEdge = max(size.width, size.height)
-                spec.backgroundOrbs.forEach { orb ->
+                spec.backgroundOrbs.forEachIndexed { index, orb ->
+                    // Each orb gets its own phase offset + drift radius, so
+                    // layers move at different apparent depths (parallax).
+                    val p = if (reduceMotion) 0f
+                    else ((phase + index * 0.33f) % 1f) * 2f * Math.PI.toFloat()
+                    val driftAmp = maxEdge * 0.015f * (1 + index % 3)
+                    val cx = size.width * orb.x + kotlin.math.sin(p) * driftAmp
+                    val cy = size.height * orb.y + kotlin.math.cos(p * 0.8f) * driftAmp
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 orb.color.copy(alpha = orb.alpha),
                                 orb.color.copy(alpha = 0f)
                             ),
-                            center = Offset(size.width * orb.x, size.height * orb.y),
+                            center = Offset(cx, cy),
                             radius = maxEdge * orb.radius
                         ),
                         radius = maxEdge * orb.radius,
-                        center = Offset(size.width * orb.x, size.height * orb.y)
+                        center = Offset(cx, cy)
                     )
                 }
             }

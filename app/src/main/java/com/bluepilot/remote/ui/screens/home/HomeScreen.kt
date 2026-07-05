@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Bolt
@@ -73,7 +74,10 @@ private data class HomeTile(
 private val tiles = listOf(
     HomeTile("Connect", "Pair with a PC or device", Icons.Rounded.Bluetooth, Routes.CONNECTION, needsPermissions = true, gel = 0xFF2F6BFF),
     HomeTile("Mouse", "Trackpad and buttons", Icons.Rounded.Mouse, Routes.MOUSE, gel = 0xFF3D8BFF),
-    HomeTile("Keyboard", "Full PC keyboard", Icons.Rounded.Keyboard, Routes.KEYBOARD, gel = 0xFF9B59F6),
+    HomeTile("Air Mouse", "Point the phone to move", Icons.Rounded.Mouse, Routes.AIR_MOUSE, gel = 0xFF00C2A8),
+    HomeTile("Keyboard", "Shortcuts & text input", Icons.Rounded.Keyboard, Routes.KEYBOARD, gel = 0xFF9B59F6),
+    HomeTile("Full Board", "Complete QWERTY keyboard", Icons.Rounded.Keyboard, Routes.FULL_KEYBOARD, gel = 0xFF7B68EE),
+    HomeTile("PC Combo", "Trackpad + keyboard together", Icons.Rounded.Computer, Routes.PC_COMBO, gel = 0xFF00A8CC),
     HomeTile("Numpad", "Numeric keypad", Icons.Rounded.Pin, Routes.NUMPAD, gel = 0xFFFF8C42),
     HomeTile("Multimedia", "Media and volume", Icons.Rounded.MusicNote, Routes.MULTIMEDIA, gel = 0xFF17C3CE),
     HomeTile("Presenter", "Slide control", Icons.Rounded.Slideshow, Routes.PRESENTER, gel = 0xFFF5C542),

@@ -57,6 +57,7 @@ class HidService : Service() {
     }
 
     @Inject lateinit var hidController: HidController
+    @Inject lateinit var haptics: com.bluepilot.remote.haptics.Haptics
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -73,6 +74,18 @@ class HidService : Service() {
             .map { stateLabel(it) }
             .distinctUntilChanged()
             .onEach { label -> updateNotification(label) }
+            .launchIn(serviceScope)
+        // SECTION 8 — connection event haptics: double pulse on connect,
+        // heavy thud on error (distinctUntilChanged = one buzz per change).
+        hidController.state
+            .map { it::class.simpleName ?: "" }
+            .distinctUntilChanged()
+            .onEach { name ->
+                when (name) {
+                    "Connected" -> haptics.play(com.bluepilot.remote.model.gamepad.HapticPattern.DOUBLE_PULSE)
+                    "Error", "HidUnsupported" -> haptics.play(com.bluepilot.remote.model.gamepad.HapticPattern.HEAVY_THUD)
+                }
+            }
             .launchIn(serviceScope)
         Timber.i("HidService created")
     }

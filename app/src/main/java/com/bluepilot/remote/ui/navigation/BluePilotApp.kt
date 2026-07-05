@@ -3,10 +3,23 @@ package com.bluepilot.remote.ui.navigation
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.bluepilot.remote.ui.components.GlassDock
+import com.bluepilot.remote.ui.components.OnboardingOverlay
+import com.bluepilot.remote.viewmodel.SettingsViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -16,6 +29,9 @@ import com.bluepilot.remote.ui.screens.devices.DevicesScreen
 import com.bluepilot.remote.ui.screens.home.HomeScreen
 import com.bluepilot.remote.ui.screens.permission.PermissionScreen
 import com.bluepilot.remote.ui.screens.gamepad.GamepadScreen
+import com.bluepilot.remote.ui.screens.fullkeyboard.FullKeyboardScreen
+import com.bluepilot.remote.ui.screens.airmouse.AirMouseScreen
+import com.bluepilot.remote.ui.screens.pccombo.PcComboScreen
 import com.bluepilot.remote.ui.screens.gamepadbuilder.GamepadBuilderScreen
 import com.bluepilot.remote.ui.screens.help.HelpScreen
 import com.bluepilot.remote.ui.screens.keyboard.KeyboardScreen
@@ -57,29 +73,44 @@ object Routes {
     const val MACROS = "macros"
     const val THEMES = "themes"
     const val GAMEPAD_BUILDER = "gamepad_builder"
+    const val FULL_KEYBOARD = "full_keyboard"
+    const val PC_COMBO = "pc_combo"
+    const val AIR_MOUSE = "air_mouse"
 }
 
 @Composable
 fun BluePilotApp() {
     val navController = rememberNavController()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val appSettings by settingsViewModel.app.collectAsState()
+    val backStack by navController.currentBackStackEntryAsState()
+    val currentRoute = backStack?.destination?.route
 
-    // SECTION 3B — smooth screen transitions: horizontal slide + fade,
-    // mirrored for back navigation. 260ms tween ≈ Material motion spec.
+    // UI/UX redesign: dock shows only on the four top-level hubs so control
+    // surfaces (mouse/keyboard/gamepad...) keep the full screen.
+    val dockRoutes = setOf(Routes.HOME, Routes.LAYOUTS, Routes.DEVICES, Routes.SETTINGS)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+
+    // SECTION 3D — card-flip screen transitions: incoming screen rotates in
+    // around the Y axis (12° -> 0°) with a slide, like turning a card.
+    // Under Reduce Motion this collapses to a plain fast fade.
+    val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current
+    val flipIn = scaleIn(tween(280), initialScale = 0.92f) + fadeIn(tween(280)) +
+        slideInHorizontally(tween(280)) { it / 5 }
+    val flipOut = scaleOut(tween(220), targetScale = 0.94f) + fadeOut(tween(200)) +
+        slideOutHorizontally(tween(280)) { -it / 5 }
+    val flipPopIn = scaleIn(tween(280), initialScale = 0.92f) + fadeIn(tween(280)) +
+        slideInHorizontally(tween(280)) { -it / 5 }
+    val flipPopOut = scaleOut(tween(220), targetScale = 0.94f) + fadeOut(tween(200)) +
+        slideOutHorizontally(tween(280)) { it / 5 }
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
-        enterTransition = {
-            slideInHorizontally(tween(260)) { it / 4 } + fadeIn(tween(260))
-        },
-        exitTransition = {
-            slideOutHorizontally(tween(260)) { -it / 4 } + fadeOut(tween(200))
-        },
-        popEnterTransition = {
-            slideInHorizontally(tween(260)) { -it / 4 } + fadeIn(tween(260))
-        },
-        popExitTransition = {
-            slideOutHorizontally(tween(260)) { it / 4 } + fadeOut(tween(200))
-        }
+        enterTransition = { if (reduceMotion) fadeIn(tween(120)) else flipIn },
+        exitTransition = { if (reduceMotion) fadeOut(tween(120)) else flipOut },
+        popEnterTransition = { if (reduceMotion) fadeIn(tween(120)) else flipPopIn },
+        popExitTransition = { if (reduceMotion) fadeOut(tween(120)) else flipPopOut }
     ) {
         composable(Routes.HOME) {
             HomeScreen(
@@ -128,6 +159,9 @@ fun BluePilotApp() {
         composable(Routes.MACROS) { MacrosScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.THEMES) { ThemeGalleryScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.GAMEPAD_BUILDER) { GamepadBuilderScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.FULL_KEYBOARD) { FullKeyboardScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.PC_COMBO) { PcComboScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.AIR_MOUSE) { AirMouseScreen(onBack = { navController.popBackStack() }) }
         composable(
             route = "${Routes.LAYOUT_EDITOR}/{profileId}",
             arguments = listOf(navArgument("profileId") { type = NavType.LongType })
@@ -136,4 +170,26 @@ fun BluePilotApp() {
         }
         // Layout editor (Module 6) and combo profiles (Module 7) append here.
     }
+
+    // Floating glass dock (top-level hubs only)
+    if (currentRoute in dockRoutes) {
+        GlassDock(
+            currentRoute = currentRoute,
+            onNavigate = { route ->
+                navController.navigate(route) {
+                    popUpTo(Routes.HOME) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+
+    // First-run tutorial overlay
+    OnboardingOverlay(
+        visible = !appSettings.onboardingDone,
+        onFinish = { settingsViewModel.setOnboardingDone() }
+    )
+    } // Box
 }

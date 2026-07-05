@@ -4,6 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bluepilot.remote.data.gamepad.GamepadProfile
 import com.bluepilot.remote.data.gamepad.GamepadProfileRepository
+import com.bluepilot.remote.domain.AirMouseCore
+import com.bluepilot.remote.sensors.MotionSensorSource
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import com.bluepilot.remote.domain.GamepadRuntimeCore
 import com.bluepilot.remote.domain.usecase.ObserveConnectionUseCase
 import com.bluepilot.remote.domain.usecase.SendHidActionUseCase
@@ -12,7 +17,10 @@ import com.bluepilot.remote.model.HidAction
 import com.bluepilot.remote.model.gamepad.GamepadControlSpec
 import com.bluepilot.remote.model.gamepad.GamepadControlType
 import com.bluepilot.remote.model.gamepad.GamepadLayoutSpec
+import com.bluepilot.remote.model.gamepad.ResponseCurves
 import com.bluepilot.remote.model.gamepad.StickSide
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import com.bluepilot.remote.model.widgets.WidgetFrame
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,8 +44,91 @@ import javax.inject.Inject
 class GamepadBuilderViewModel @Inject constructor(
     private val repository: GamepadProfileRepository,
     observeConnection: ObserveConnectionUseCase,
-    private val sendAction: SendHidActionUseCase
+    private val sendAction: SendHidActionUseCase,
+    private val sensors: MotionSensorSource,
+    private val haptics: com.bluepilot.remote.haptics.Haptics
 ) : ViewModel() {
+
+    // ------------------------------------------------------------------
+    // SECTION 7 — Motion controls (gyro steering/aim) while playing.
+    // Gyro maps onto the RIGHT stick axes (camera/aim convention), so the
+    // physical left stick still handles movement simultaneously.
+    // ------------------------------------------------------------------
+    val hasGyro: Boolean get() = sensors.hasGyroscope
+
+    private val _motionEnabled = MutableStateFlow(false)
+    val motionEnabled: StateFlow<Boolean> = _motionEnabled.asStateFlow()
+
+    private val _motionSensitivity = MutableStateFlow(50)
+    val motionSensitivity: StateFlow<Int> = _motionSensitivity.asStateFlow()
+
+    private val _motionDeadZone = MutableStateFlow(8)
+    val motionDeadZone: StateFlow<Int> = _motionDeadZone.asStateFlow()
+
+    private val motionCore = AirMouseCore(sensitivity = 50, smoothing = 35)
+    private var motionJob: kotlinx.coroutines.Job? = null
+    // Current gyro-driven aim (added to hidState right stick as -1..1).
+    private var aimX = 0f
+    private var aimY = 0f
+
+    fun setMotionEnabled(value: Boolean) {
+        if (value == _motionEnabled.value) return
+        _motionEnabled.value = value
+        if (value) startMotion() else stopMotion()
+    }
+
+    fun setMotionSensitivity(value: Int) {
+        _motionSensitivity.value = value.coerceIn(0, 100)
+        motionCore.sensitivity = _motionSensitivity.value
+    }
+
+    fun setMotionDeadZone(value: Int) { _motionDeadZone.value = value.coerceIn(0, 50) }
+
+    /** Recenter aim (drift correction). */
+    fun recenterMotion() {
+        motionCore.recenter(); aimX = 0f; aimY = 0f
+        pushMotionAim()
+    }
+
+    private fun startMotion() {
+        motionCore.recenter(); aimX = 0f; aimY = 0f
+        motionJob = sensors.gyro()
+            .onEach { sample ->
+                val (dx, dy) = motionCore.step(gyroYaw = sample.y, gyroPitch = sample.x)
+                if (dx == 0 && dy == 0) return@onEach
+                // Integrate pixel-ish deltas into a -1..1 aim vector with decay.
+                aimX = (aimX + dx / 90f).coerceIn(-1f, 1f)
+                aimY = (aimY + dy / 90f).coerceIn(-1f, 1f)
+                pushMotionAim()
+            }
+            .catch { }
+            .launchIn(viewModelScope)
+        // Aim auto-decays toward center so releasing motion recenters camera.
+        viewModelScope.launch {
+            while (_motionEnabled.value) {
+                delay(50)
+                if (kotlin.math.abs(aimX) > 0.02f || kotlin.math.abs(aimY) > 0.02f) {
+                    aimX *= 0.9f; aimY *= 0.9f
+                    pushMotionAim()
+                }
+            }
+        }
+    }
+
+    private fun pushMotionAim() {
+        val dz = _motionDeadZone.value / 100f
+        val ax = if (kotlin.math.abs(aimX) < dz) 0f else aimX
+        val ay = if (kotlin.math.abs(aimY) < dz) 0f else aimY
+        hidState = hidState.copy(rightX = ax, rightY = ay)
+        sendAction(HidAction.GamepadUpdate(hidState))
+    }
+
+    private fun stopMotion() {
+        motionJob?.cancel(); motionJob = null
+        aimX = 0f; aimY = 0f
+        hidState = hidState.copy(rightX = 0f, rightY = 0f)
+        sendAction(HidAction.GamepadUpdate(hidState))
+    }
 
     companion object {
         private const val UNDO_LIMIT = 20
@@ -106,6 +197,9 @@ class GamepadBuilderViewModel @Inject constructor(
     }
 
     fun stopPlaying() {
+        turboJobs.values.forEach { it.cancel() }
+        turboJobs.clear()
+        setMotionEnabled(false)
         neutralizeHid()
         _playing.value = null
     }
@@ -115,6 +209,12 @@ class GamepadBuilderViewModel @Inject constructor(
      * Idempotent: only sends when something is actually non-neutral, and
      * safe to call even while disconnected (HidEngine drops the report).
      */
+    fun setNaming(naming: com.bluepilot.remote.model.gamepad.ButtonNaming) =
+        mutate { it.copy(naming = naming) }
+
+    fun setStickSensitivity(value: Int) =
+        mutate(withUndo = false) { it.copy(stickSensitivity = value.coerceIn(0, 100)) }
+
     fun neutralizeHid() {
         if (hidState != GamepadSnapshot()) {
             hidState = GamepadSnapshot()
@@ -154,13 +254,49 @@ class GamepadBuilderViewModel @Inject constructor(
     // Live HID handling (play mode + editor preview)
     // ------------------------------------------------------------------
 
+    // Turbo/rapid-fire jobs per control id (cancelled on release).
+    private val turboJobs = mutableMapOf<String, Job>()
+
     fun onButton(control: GamepadControlSpec, pressed: Boolean) {
+        if (control.turbo && pressed) {
+            // SECTION 5 — turbo: auto-repeat press/release at turboRate Hz
+            // while held. One job per control; releasing cancels it.
+            turboJobs[control.id]?.cancel()
+            turboJobs[control.id] = viewModelScope.launch {
+                val period = (1000L / control.turboRate.coerceIn(2, 20))
+                while (true) {
+                    hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, true)
+                    sendAction(HidAction.GamepadUpdate(hidState))
+                    delay(period / 2)
+                    hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, false)
+                    sendAction(HidAction.GamepadUpdate(hidState))
+                    delay(period / 2)
+                }
+            }
+            return
+        }
+        if (control.turbo && !pressed) {
+            turboJobs.remove(control.id)?.cancel()
+            hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, false)
+            sendAction(HidAction.GamepadUpdate(hidState))
+            return
+        }
         hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, pressed)
         sendAction(HidAction.GamepadUpdate(hidState))
+        // SECTION 8 — per-control haptic pattern on press.
+        if (pressed) haptics.play(control.haptic)
     }
 
     fun onStick(control: GamepadControlSpec, x: Float, y: Float) {
-        hidState = GamepadRuntimeCore.withStick(hidState, control.stickSide, x, y, control.deadZone)
+        // SECTION 5 — response curve + per-profile sensitivity before dead zone.
+        val sens = ((_playing.value ?: run { null })?.spec?.stickSensitivity
+            ?: draft.value?.second?.stickSensitivity ?: 70) / 100f * 1.4f + 0.3f
+        val cx = ResponseCurves.apply(x, control.curve) * sens
+        val cy = ResponseCurves.apply(y, control.curve) * sens
+        hidState = GamepadRuntimeCore.withStick(
+            hidState, control.stickSide,
+            cx.coerceIn(-1f, 1f), cy.coerceIn(-1f, 1f), control.deadZone
+        )
         sendAction(HidAction.GamepadUpdate(hidState))
     }
 
