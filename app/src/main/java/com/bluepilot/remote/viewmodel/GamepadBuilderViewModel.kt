@@ -67,6 +67,7 @@ class GamepadBuilderViewModel @Inject constructor(
 
     private val motionCore = AirMouseCore(sensitivity = 50, smoothing = 35)
     private var motionJob: kotlinx.coroutines.Job? = null
+    private var decayJob: kotlinx.coroutines.Job? = null
     // Current gyro-driven aim (added to hidState right stick as -1..1).
     private var aimX = 0f
     private var aimY = 0f
@@ -104,7 +105,8 @@ class GamepadBuilderViewModel @Inject constructor(
             .catch { }
             .launchIn(viewModelScope)
         // Aim auto-decays toward center so releasing motion recenters camera.
-        viewModelScope.launch {
+        decayJob?.cancel()
+        decayJob = viewModelScope.launch {
             while (_motionEnabled.value) {
                 delay(50)
                 if (kotlin.math.abs(aimX) > 0.02f || kotlin.math.abs(aimY) > 0.02f) {
@@ -125,6 +127,7 @@ class GamepadBuilderViewModel @Inject constructor(
 
     private fun stopMotion() {
         motionJob?.cancel(); motionJob = null
+        decayJob?.cancel(); decayJob = null
         aimX = 0f; aimY = 0f
         hidState = hidState.copy(rightX = 0f, rightY = 0f)
         sendAction(HidAction.GamepadUpdate(hidState))
@@ -158,6 +161,10 @@ class GamepadBuilderViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    /** SECTION 10.1 - last pressed control label (debug/testing aid). */
+    private val _lastPressed = MutableStateFlow("")
+    val lastPressed: StateFlow<String> = _lastPressed.asStateFlow()
+
     private val _exportPayload = MutableStateFlow<Pair<String, String>?>(null)
     val exportPayload: StateFlow<Pair<String, String>?> = _exportPayload.asStateFlow()
 
@@ -180,7 +187,12 @@ class GamepadBuilderViewModel @Inject constructor(
 
     fun play(id: Long) {
         viewModelScope.launch {
+            // BUGFIX: cancel any running turbo before switching profiles so a
+            // held rapid-fire button can't keep firing into the new profile.
+            turboJobs.values.forEach { it.cancel() }
+            turboJobs.clear()
             hidState = GamepadSnapshot()
+            sendAction(HidAction.GamepadUpdate(hidState))
             _playing.value = repository.byId(id)
         }
     }
@@ -467,4 +479,15 @@ class GamepadBuilderViewModel @Inject constructor(
     }
 
     fun consumeMessage() { _message.value = null }
+
+    override fun onCleared() {
+        // BUGFIX: never leave stuck inputs on the host when the VM dies.
+        turboJobs.values.forEach { it.cancel() }
+        turboJobs.clear()
+        motionJob?.cancel()
+        if (hidState != GamepadSnapshot()) {
+            sendAction(HidAction.GamepadUpdate(GamepadSnapshot()))
+        }
+        super.onCleared()
+    }
 }

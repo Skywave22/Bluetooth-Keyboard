@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -86,7 +87,7 @@ fun MouseScreen(
                 // ---------- Trackpad ----------
                 GlassCard(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1f).shadow3DPad()
                         .fillMaxHeight()
                         .pointerInput(Unit) {
                             detectTapGestures(
@@ -186,3 +187,7 @@ fun MouseScreen(
         }
     }
 }
+
+/** SECTION 5 - 3D pad lift: frosted surface floats above background. */
+private fun Modifier.shadow3DPad(): Modifier =
+    this.graphicsLayer { shadowElevation = 8f * density }

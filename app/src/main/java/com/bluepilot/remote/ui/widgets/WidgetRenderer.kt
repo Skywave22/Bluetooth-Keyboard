@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -91,8 +92,8 @@ fun RenderWidget(
     modifier: Modifier = Modifier
 ) {
     val style = widget.style.sanitized()
-    val bg = Color(style.backgroundColor.toULong().toLong() and 0xFFFFFFFF).copy(alpha = style.opacity)
-    val fg = Color(style.contentColor.toULong().toLong() and 0xFFFFFFFF)
+    val bg = style.backgroundColor.toComposeColor().copy(alpha = style.opacity)
+    val fg = style.contentColor.toComposeColor()
     val shape = RoundedCornerShape(style.cornerRadius.dp)
 
     val themeSpec = LocalAppTheme.current

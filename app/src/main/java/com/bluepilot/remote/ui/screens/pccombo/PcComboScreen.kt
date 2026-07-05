@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -141,7 +142,9 @@ fun PcComboScreen(
                         .pointerInput(Unit) {
                             detectDragGestures { change, drag ->
                                 change.consume()
-                                viewModel.setRatio(ratio + drag.y / totalHpx)
+                                // BUGFIX: read live value (not composition-captured)
+                                // so fast drags never compound stale ratios.
+                                viewModel.setRatio(viewModel.ratio.value + drag.y / totalHpx)
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -177,7 +180,7 @@ fun PcComboScreen(
                                         .weight(key.widthWeight)
                                         .heightIn(min = 34.dp)
                                         .background(
-                                            key.colorArgb?.let { Color(it.toULong().toLong() and 0xFFFFFFFF) }
+                                            key.colorArgb?.let { it.toComposeColor() }
                                                 ?: MaterialTheme.colorScheme.surfaceVariant,
                                             MaterialTheme.shapes.small
                                         )

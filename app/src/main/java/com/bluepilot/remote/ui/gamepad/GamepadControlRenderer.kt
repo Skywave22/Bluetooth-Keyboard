@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -20,7 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -97,7 +101,7 @@ internal fun controlShape(shape: ControlShape): Shape = when (shape) {
 }
 
 internal fun controlColor(control: GamepadControlSpec): Color =
-    Color(control.color.toULong().toLong() and 0xFFFFFFFF)
+    control.color.toComposeColor()
         .copy(alpha = control.opacity.coerceIn(0.15f, 1f))
 
 /** Button/trigger: exact press & release tracking, visual pressed state. */
@@ -131,7 +135,24 @@ private fun PressableControl(
                     }
                 }
             }
-            .background(if (pressed) base.copy(alpha = 1f) else base, shape)
+            .shadow(if (pressed) 1.dp else 6.dp, shape, clip = false)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        base.copy(alpha = 1f),
+                        base.copy(
+                            red = base.red * 0.65f,
+                            green = base.green * 0.65f,
+                            blue = base.blue * 0.65f
+                        )
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(0.35f, 0.3f).let {
+                        androidx.compose.ui.geometry.Offset(it.x * 100f, it.y * 100f)
+                    },
+                    radius = 140f
+                ),
+                shape
+            )
             .pointerInput(control.id) {
                 awaitPointerEventScope {
                     while (true) {
@@ -151,12 +172,17 @@ private fun PressableControl(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (control.label.isNotBlank()) {
-            Text(
-                text = control.label,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (control.icon.isNotBlank()) {
+                Text(text = control.icon, style = MaterialTheme.typography.titleMedium)
+            }
+            if (control.label.isNotBlank()) {
+                Text(
+                    text = control.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White
+                )
+            }
         }
     }
 }
@@ -203,7 +229,22 @@ private fun StickControl(
                 modifier = Modifier
                     .offset { IntOffset(knob.x.roundToInt(), knob.y.roundToInt()) }
                     .size(knobSize)
-                    .background(base.copy(alpha = 1f), CircleShape)
+                    .graphicsLayer {
+                        // SECTION 3 - knob tilts toward drag direction
+                        cameraDistance = 8f * density.density
+                        rotationY = (knob.x / radiusPx).coerceIn(-1f, 1f) * 18f
+                        rotationX = -(knob.y / radiusPx).coerceIn(-1f, 1f) * 18f
+                    }
+                    .shadow(4.dp, CircleShape, clip = false)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(base.copy(alpha = 1f), base.copy(
+                                red = base.red * 0.6f,
+                                green = base.green * 0.6f,
+                                blue = base.blue * 0.6f))
+                        ),
+                        CircleShape
+                    )
             )
         }
     }
@@ -221,10 +262,19 @@ private fun DpadControl(
         val sizePx = with(LocalDensity.current) {
             (if (maxWidth < maxHeight) maxWidth else maxHeight).toPx()
         }.coerceAtLeast(1f)
+        // SECTION 3 - 3D dpad: cross tilts toward the pressed direction
+        var tiltX by remember { mutableStateOf(0f) }
+        var tiltY by remember { mutableStateOf(0f) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    cameraDistance = 10f * density
+                    rotationY = tiltX * 10f
+                    rotationX = -tiltY * 10f
+                }
+                .shadow(if (tiltX != 0f || tiltY != 0f) 2.dp else 5.dp, RoundedCornerShape(20.dp), clip = false)
                 .background(base, RoundedCornerShape(20.dp))
                 .pointerInput(control.id) {
                     awaitPointerEventScope {
@@ -234,8 +284,10 @@ private fun DpadControl(
                             if (change != null && change.pressed) {
                                 val dx = ((change.position.x - size.width / 2f) / (sizePx / 2f)).coerceIn(-1f, 1f)
                                 val dy = ((change.position.y - size.height / 2f) / (sizePx / 2f)).coerceIn(-1f, 1f)
+                                tiltX = dx; tiltY = dy
                                 events.onDpadTouch(control, dx, dy)
                             } else {
+                                tiltX = 0f; tiltY = 0f
                                 events.onDpadRelease(control)
                             }
                         }

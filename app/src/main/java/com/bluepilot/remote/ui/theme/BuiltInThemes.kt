@@ -238,6 +238,95 @@ object BuiltInThemes {
         monoFont = true
     )
 
+
+    val CYBERPUNK = AppThemeSpec(
+        id = "cyberpunk", name = "Cyberpunk", isDark = true,
+        primary = Color(0xFFFCEE0A), onPrimary = Color.Black,
+        secondary = Color(0xFF00F0FF),
+        background = Color(0xFF0D0221), onBackground = Color(0xFFF3E9FF),
+        surface = Color(0xFF1A0B38), onSurface = Color(0xFFF3E9FF),
+        surfaceVariant = Color(0xFF261352), onSurfaceVariant = Color(0xFFB79ADB),
+        outline = Color(0xFF4A2A78),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFFFCEE0A), 0.85f, 0.15f, 0.32f, 0.20f),
+            ThemeOrb(Color(0xFF00F0FF), 0.12f, 0.80f, 0.40f, 0.22f),
+            ThemeOrb(Color(0xFFFF2D95), 0.55f, 0.45f, 0.35f, 0.15f)
+        ),
+        cornerRadius = 10, surfaceAlpha = 0.90f, edgeGlow = true,
+        elevation = 0, glowColor = Color(0xFFFCEE0A)
+    )
+
+    val CHROME = AppThemeSpec(
+        id = "chrome", name = "Chrome Metal", isDark = false,
+        primary = Color(0xFF37474F), onPrimary = Color.White,
+        secondary = Color(0xFF00838F),
+        background = Color(0xFFE8EBEE), onBackground = Color(0xFF20262B),
+        surface = Color(0xFFF6F8FA), onSurface = Color(0xFF20262B),
+        surfaceVariant = Color(0xFFD5DBe1), onSurfaceVariant = Color(0xFF4A555E),
+        outline = Color(0xFFAAB4BD),
+        cornerRadius = 12, elevation = 3, edgeGlow = true
+    )
+
+    val SYNTHWAVE = AppThemeSpec(
+        id = "synthwave", name = "Synthwave", isDark = true,
+        primary = Color(0xFFFF6EC7), onPrimary = Color.Black,
+        secondary = Color(0xFF7DF9FF),
+        background = Color(0xFF16003B), onBackground = Color(0xFFFFE3F8),
+        surface = Color(0xFF260A52), onSurface = Color(0xFFFFE3F8),
+        surfaceVariant = Color(0xFF351570), onSurfaceVariant = Color(0xFFC9A8E8),
+        outline = Color(0xFF5A2D96),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFFFF6EC7), 0.50f, 0.85f, 0.55f, 0.28f),
+            ThemeOrb(Color(0xFF7DF9FF), 0.85f, 0.15f, 0.35f, 0.20f)
+        ),
+        cornerRadius = 18, surfaceAlpha = 0.88f, edgeGlow = true,
+        elevation = 0, glowColor = Color(0xFFFF6EC7)
+    )
+
+    val GALAXY = AppThemeSpec(
+        id = "galaxy", name = "Galaxy", isDark = true,
+        primary = Color(0xFF9F7BFF), onPrimary = Color.White,
+        secondary = Color(0xFF4DD0E1),
+        background = Color(0xFF060312), onBackground = Color(0xFFEDE7FF),
+        surface = Color(0xFF150E2E), onSurface = Color(0xFFEDE7FF),
+        surfaceVariant = Color(0xFF201646), onSurfaceVariant = Color(0xFFAF9FD6),
+        outline = Color(0xFF3D2E6E),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFF6A3DE8), 0.20f, 0.20f, 0.45f, 0.30f),
+            ThemeOrb(Color(0xFF4DD0E1), 0.80f, 0.60f, 0.30f, 0.20f),
+            ThemeOrb(Color(0xFFE91E63), 0.45f, 0.90f, 0.35f, 0.15f)
+        ),
+        cornerRadius = 22, surfaceAlpha = 0.82f, edgeGlow = true, elevation = 0
+    )
+
+    val TACTICAL = AppThemeSpec(
+        id = "tactical", name = "Tactical", isDark = true,
+        primary = Color(0xFF8BC34A), onPrimary = Color.Black,
+        secondary = Color(0xFFCDDC39),
+        background = Color(0xFF14180F), onBackground = Color(0xFFE2E8D5),
+        surface = Color(0xFF1E2417), onSurface = Color(0xFFE2E8D5),
+        surfaceVariant = Color(0xFF2A331F), onSurfaceVariant = Color(0xFF9AA88A),
+        outline = Color(0xFF44523A),
+        cornerRadius = 6, elevation = 1, edgeGlow = true, monoFont = true,
+        glowColor = Color(0xFF8BC34A)
+    )
+
+    val PASTEL = AppThemeSpec(
+        id = "pastel", name = "Pastel Soft", isDark = false,
+        primary = Color(0xFF7C9EF5), onPrimary = Color.White,
+        secondary = Color(0xFFF5A9C4),
+        background = Color(0xFFFDF7FA), onBackground = Color(0xFF3A3A4A),
+        surface = Color(0xFFFFFFFF), onSurface = Color(0xFF3A3A4A),
+        surfaceVariant = Color(0xFFF3E9F2), onSurfaceVariant = Color(0xFF77778A),
+        outline = Color(0xFFD9CBE0),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFFBFD4FF), 0.20f, 0.15f, 0.45f, 0.40f),
+            ThemeOrb(Color(0xFFFFD6E8), 0.85f, 0.50f, 0.38f, 0.38f),
+            ThemeOrb(Color(0xFFD9F7E8), 0.40f, 0.90f, 0.42f, 0.35f)
+        ),
+        cornerRadius = 26, surfaceAlpha = 0.90f, edgeGlow = true, elevation = 0
+    )
+
     /** All themes, gallery order. */
     val ALL: List<AppThemeSpec> = listOf(
         PILOT_DARK, PILOT_GLOW,
@@ -245,7 +334,8 @@ object BuiltInThemes {
         GLASS_YOU_DARK, GLASS_YOU_LIGHT,
         HAWAII_NIGHT, HAWAII_DAY,
         COCKPIT_HUD, DAY_FLIGHT,
-        DARK_NEON, OLED_BLACK, MINIMAL_LIGHT
+        DARK_NEON, OLED_BLACK, MINIMAL_LIGHT,
+        CYBERPUNK, SYNTHWAVE, GALAXY, TACTICAL, CHROME, PASTEL
     )
 
     /** Safe lookup with default fallback. */

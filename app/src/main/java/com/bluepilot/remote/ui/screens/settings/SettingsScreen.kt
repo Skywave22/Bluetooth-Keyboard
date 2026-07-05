@@ -55,6 +55,7 @@ import com.bluepilot.remote.viewmodel.SettingsViewModel
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenThemes: () -> Unit = {},
+    onOpen3DPreview: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val app by viewModel.app.collectAsState()
@@ -97,8 +98,7 @@ fun SettingsScreen(
             )
 
             // ---------- General ----------
-            if (matches("theme", "fullscreen", "screen", "vibration", "secure", "gallery", "motion", "3d"))
-            SettingsGroup("General") {
+            if (matches("theme", "fullscreen", "screen", "vibration", "secure", "gallery", "motion", "3d", "icon", "pack")) SettingsGroup("General") {
                 OutlinedButton(
                     onClick = onOpenThemes,
                     modifier = Modifier.fillMaxWidth(),
@@ -169,6 +169,28 @@ fun SettingsScreen(
                         }
                     }
                 }
+                Text("3D quality", style = MaterialTheme.typography.bodyMedium)
+                Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                    listOf("FULL", "REDUCED", "FLAT").forEach { q ->
+                        FilterChip(
+                            selected = app.quality3D == q,
+                            onClick = { viewModel.setQuality3D(q) },
+                            label = { Text(q.lowercase().replaceFirstChar { it.uppercase() }) },
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                    }
+                }
+                Text("Icon pack", style = MaterialTheme.typography.bodyMedium)
+                Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                    listOf("FILLED", "OUTLINED", "ROUNDED", "SHARP").forEach { pack ->
+                        FilterChip(
+                            selected = app.iconPack == pack,
+                            onClick = { viewModel.setIconPack(pack) },
+                            label = { Text(pack.lowercase().replaceFirstChar { it.uppercase() }) },
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                    }
+                }
                 ToggleRow(
                     "Reduce motion",
                     app.reduceMotion,
@@ -184,8 +206,7 @@ fun SettingsScreen(
             }
 
             // ---------- Mouse ----------
-            if (matches("mouse", "trackpad", "sensitivity", "scroll", "smoothing", "pen", "tap"))
-            SettingsGroup("Mouse & trackpad") {
+            if (matches("mouse", "trackpad", "sensitivity", "scroll", "smoothing", "pen", "tap")) SettingsGroup("Mouse & trackpad") {
                 SliderRow("Sensitivity", mouse.sensitivity, viewModel::setMouseSensitivity)
                 SliderRow("Scroll speed", mouse.scrollSpeed, viewModel::setScrollSpeed)
                 SliderRow("Movement smoothing", mouse.movementSmoothing, viewModel::setMovementSmoothing)
@@ -195,14 +216,12 @@ fun SettingsScreen(
             }
 
             // ---------- Keyboard ----------
-            if (matches("keyboard", "text", "input"))
-            SettingsGroup("Keyboard") {
+            if (matches("keyboard", "text", "input")) SettingsGroup("Keyboard") {
                 ToggleRow("Show text input bar", keyboard.showTextInputBar, viewModel::setShowTextInputBar)
             }
 
             // ---------- Gamepad ----------
-            if (matches("gamepad", "joystick", "dead", "haptic", "mode"))
-            SettingsGroup("Gamepad") {
+            if (matches("gamepad", "joystick", "dead", "haptic", "mode")) SettingsGroup("Gamepad") {
                 Text(
                     text = if (spec.monoFont) "MODE" else "Mode",
                     style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)

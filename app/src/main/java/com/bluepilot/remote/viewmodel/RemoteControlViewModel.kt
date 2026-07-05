@@ -61,32 +61,17 @@ class RemoteControlViewModel @Inject constructor(
     // Mouse
     // ------------------------------------------------------------------
 
-    // Smoothing memory + fractional remainders (integer reports must not eat slow motion).
-    private var smoothX = 0f
-    private var smoothY = 0f
-    private var fracX = 0f
-    private var fracY = 0f
-    private var scrollAccum = 0f
+    // OPTIMIZATION: shared TrackpadEngine (was ~30 duplicated lines).
+    private val trackpad = com.bluepilot.remote.domain.TrackpadEngine { mouseSettings.value }
 
     /** Raw trackpad drag delta in px → settings-adjusted HID mouse move. */
     fun onTrackpadDelta(dxPx: Float, dyPx: Float) {
-        val s = mouseSettings.value
-        val g = PointerMath.gain(s.sensitivity, s.penMode)
-        smoothX = PointerMath.smooth(smoothX, dxPx * g, s.movementSmoothing)
-        smoothY = PointerMath.smooth(smoothY, dyPx * g, s.movementSmoothing)
-        val fx = smoothX + fracX
-        val fy = smoothY + fracY
-        val ix = fx.toInt()
-        val iy = fy.toInt()
-        fracX = fx - ix
-        fracY = fy - iy
+        val (ix, iy) = trackpad.move(dxPx, dyPx)
         if (ix != 0 || iy != 0) sendAction(HidAction.MouseMove(ix, iy))
     }
 
     /** Reset motion state when a new gesture starts (prevents smoothing bleed). */
-    fun onTrackpadGestureStart() {
-        smoothX = 0f; smoothY = 0f; fracX = 0f; fracY = 0f
-    }
+    fun onTrackpadGestureStart() = trackpad.startGesture()
 
     /** Tap on trackpad → left click (honors tap-to-click setting). */
     fun onTrackpadTap() {
@@ -106,11 +91,7 @@ class RemoteControlViewModel @Inject constructor(
 
     /** Scroll strip drag: accumulate px, emit whole wheel steps. */
     fun onScrollDelta(dyPx: Float) {
-        val s = mouseSettings.value
-        scrollAccum += dyPx
-        val (steps, remainder) = PointerMath.scrollSteps(scrollAccum, s.scrollSpeed, s.invertScroll)
-        scrollAccum = remainder
-        if (steps != 0) sendAction(HidAction.MouseScroll(steps))
+        trackpad.scroll(dyPx).takeIf { it != 0 }?.let { sendAction(HidAction.MouseScroll(it)) }
     }
 
     // ------------------------------------------------------------------

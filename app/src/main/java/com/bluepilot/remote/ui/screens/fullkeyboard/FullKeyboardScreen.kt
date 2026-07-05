@@ -39,9 +39,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -191,19 +197,36 @@ private fun KeyCap(
     onTap: () -> Unit,
     onLongPress: () -> Unit
 ) {
-    val custom = key.colorArgb?.let { Color(it.toULong().toLong() and 0xFFFFFFFF) }
+    val custom = key.colorArgb?.let { it.toComposeColor() }
     val bg = custom ?: MaterialTheme.colorScheme.surfaceVariant
+    // SECTION 4 - 3D keycap: pressed state sinks + shadow shrinks
+    var pressed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Box(
         modifier = modifier
             .heightIn(min = 40.dp)
-            .background(bg, MaterialTheme.shapes.small)
+            .graphicsLayer {
+                if (pressed) {
+                    scaleX = 0.95f; scaleY = 0.95f
+                    translationY = 2f * density
+                }
+            }
+            .shadow(if (pressed) 0.dp else 3.dp, MaterialTheme.shapes.small, clip = false)
+            .background(Brush.verticalGradient(listOf(bg.copy(alpha=1f), bg)), MaterialTheme.shapes.small)
             .then(
                 if (editMode) Modifier.border(
                     1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                     MaterialTheme.shapes.small
                 ) else Modifier
             )
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+                        .pointerInput(key.id + "-press") {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent()
+                        pressed = e.changes.any { it.pressed }
+                    }
+                }
+            }
+.combinedClickable(onClick = onTap, onLongClick = onLongPress),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -331,7 +354,7 @@ private fun KeyEditorPanel(viewModel: FullKeyboardViewModel) {
                 Box(
                     modifier = Modifier
                         .size(34.dp)
-                        .background(Color(argb.toULong().toLong() and 0xFFFFFFFF), CircleShape)
+                        .background(argb.toComposeColor(), CircleShape)
                         .border(
                             width = if (key.colorArgb == argb) 3.dp else 1.dp,
                             color = if (key.colorArgb == argb) MaterialTheme.colorScheme.primary

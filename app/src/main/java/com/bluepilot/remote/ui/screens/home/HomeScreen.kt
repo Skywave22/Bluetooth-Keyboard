@@ -39,11 +39,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -226,8 +233,22 @@ fun HomeScreen(
 
 @Composable
 private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) {
+    // SECTION 2 - 3D: idle float loop + press-lift. Cards gently hover
+    // (staggered by title hash so they do not move in sync) and sink with
+    // pressDepth3D on touch. Off under Reduce Motion / FLAT quality.
+    val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current ||
+        com.bluepilot.remote.ui.components.LocalQuality3D.current == com.bluepilot.remote.ui.components.Quality3D.FLAT
+    val floatAnim = rememberInfiniteTransition(label = "tileFloat")
+    val phase by floatAnim.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(3600 + (tile.title.hashCode() and 0x3FF), easing = androidx.compose.animation.core.LinearEasing),
+            RepeatMode.Restart
+        ), label = "tilePhase"
+    )
+
     val spec = LocalAppTheme.current
-    val gel = Color(tile.gel.toULong().toLong() and 0xFFFFFFFF)
+    val gel = tile.gel.toComposeColor()
 
     GlassCard(
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick)
@@ -255,3 +276,13 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
         }
     }
 }
+
+/** SECTION 2 - idle 3D float: gentle vertical bob via graphicsLayer. */
+private fun androidx.compose.ui.Modifier.androidGraphicsFloat(
+    phase: Float, enabled: Boolean
+): androidx.compose.ui.Modifier =
+    if (!enabled) this else this.then(
+        androidx.compose.ui.Modifier.graphicsLayer {
+            translationY = kotlin.math.sin(phase * 2f * Math.PI).toFloat() * 3f * density
+        }
+    )

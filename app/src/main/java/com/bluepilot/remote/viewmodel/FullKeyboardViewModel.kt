@@ -81,12 +81,18 @@ class FullKeyboardViewModel @Inject constructor(
         _editingKey.value = null
     }
 
-    /** Apply a transform to the edited key everywhere it appears. */
+    private var persistJob: kotlinx.coroutines.Job? = null
+
+    /** Apply a transform to the edited key everywhere it appears.
+     *  BUGFIX/PERF: slider drags fire dozens of updates per second — persist
+     *  with a 150ms debounce (latest-wins) instead of a write per tick. */
     fun updateEditingKey(transform: (KeySpec) -> KeySpec) {
         val target = _editingKey.value ?: return
         val updated = transform(target).sanitized()
         _editingKey.value = updated
-        viewModelScope.launch {
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(150)
             val current = layout.value
             store.save(
                 current.copy(

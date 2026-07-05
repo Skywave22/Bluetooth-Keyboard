@@ -7,7 +7,6 @@ import com.bluepilot.remote.data.layout.LayoutRepository
 import com.bluepilot.remote.domain.SettingsStore
 import com.bluepilot.remote.domain.usecase.ObserveConnectionUseCase
 import com.bluepilot.remote.domain.usecase.SendHidActionUseCase
-import com.bluepilot.remote.hid.PointerMath
 import com.bluepilot.remote.model.HidAction
 import com.bluepilot.remote.model.MouseButton
 import com.bluepilot.remote.model.MouseSettings
@@ -83,29 +82,18 @@ class PcComboViewModel @Inject constructor(
 
     // ---------------- trackpad input ----------------
 
-    private var smoothX = 0f; private var smoothY = 0f
-    private var fracX = 0f; private var fracY = 0f
-    private var scrollAccum = 0f
+    // OPTIMIZATION: shared TrackpadEngine (was ~25 duplicated lines).
+    private val trackpad = com.bluepilot.remote.domain.TrackpadEngine { mouse.value }
 
-    fun gestureStart() { smoothX = 0f; smoothY = 0f; fracX = 0f; fracY = 0f }
+    fun gestureStart() = trackpad.startGesture()
 
     fun move(dx: Float, dy: Float) {
-        val s = mouse.value
-        val g = PointerMath.gain(s.sensitivity, s.penMode)
-        smoothX = PointerMath.smooth(smoothX, dx * g, s.movementSmoothing)
-        smoothY = PointerMath.smooth(smoothY, dy * g, s.movementSmoothing)
-        val fx = smoothX + fracX; val fy = smoothY + fracY
-        val ix = fx.toInt(); val iy = fy.toInt()
-        fracX = fx - ix; fracY = fy - iy
+        val (ix, iy) = trackpad.move(dx, dy)
         if (ix != 0 || iy != 0) sendAction(HidAction.MouseMove(ix, iy))
     }
 
     fun scroll(dy: Float) {
-        val s = mouse.value
-        scrollAccum += dy
-        val (steps, rem) = PointerMath.scrollSteps(scrollAccum, s.scrollSpeed, s.invertScroll)
-        scrollAccum = rem
-        if (steps != 0) sendAction(HidAction.MouseScroll(steps))
+        trackpad.scroll(dy).takeIf { it != 0 }?.let { sendAction(HidAction.MouseScroll(it)) }
     }
 
     /** Tap by finger count: 1=left, 2=middle, 3=right. */

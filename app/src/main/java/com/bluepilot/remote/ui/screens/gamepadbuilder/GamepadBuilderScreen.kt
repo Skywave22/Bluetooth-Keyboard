@@ -67,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -238,6 +239,7 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
     val motionEnabled by viewModel.motionEnabled.collectAsState()
     val motionSensitivity by viewModel.motionSensitivity.collectAsState()
     val motionDeadZone by viewModel.motionDeadZone.collectAsState()
+    val lastPressed by viewModel.lastPressed.collectAsState()
     val profile = playing ?: return
 
     // BUG FIX: if the user leaves via system back (route pop), the composable
@@ -264,7 +266,12 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(profile.spec.name) },
+                title = {
+                    Text(
+                        profile.spec.name +
+                            if (lastPressed.isNotBlank()) "   [$lastPressed]" else ""
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.stopPlaying() }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
@@ -619,6 +626,21 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                 )
             }
             // SECTION 8 — per-control haptic pattern
+            Text("Icon", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(selected = control.icon.isEmpty(),
+                    onClick = { viewModel.updateSelected { it.copy(icon = "") } },
+                    label = { Text("None") })
+                com.bluepilot.remote.ui.components.ControlGlyphs.ALL.forEach { g ->
+                    FilterChip(selected = control.icon == g,
+                        onClick = { viewModel.updateSelected { it.copy(icon = g) } },
+                        label = { Text(g) })
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Text("Haptic on press", style = MaterialTheme.typography.bodyMedium)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -725,7 +747,7 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                 Box(
                     modifier = Modifier
                         .size(34.dp)
-                        .background(Color(argb.toULong().toLong() and 0xFFFFFFFF), CircleShape)
+                        .background(argb.toComposeColor(), CircleShape)
                         .border(
                             width = if (argb == control.color) 3.dp else 1.dp,
                             color = if (argb == control.color) MaterialTheme.colorScheme.primary

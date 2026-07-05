@@ -36,7 +36,7 @@ fun Modifier.pressDepth3D(
     maxTiltDegrees: Float = 6f,
     sinkFraction: Float = 0.04f
 ): Modifier {
-    val reduceMotion = LocalReduceMotion.current
+    val reduceMotion = LocalReduceMotion.current || LocalQuality3D.current == Quality3D.FLAT
     val pressed by interactionSource.collectIsPressedAsState()
 
     if (reduceMotion) {
@@ -84,3 +84,24 @@ fun pressedElevation(interactionSource: InteractionSource, idle: Float, pressed:
     )
     return value
 }
+
+/**
+ * SECTION 1 - card3D: static 3D presence for cards. Subtle fixed tilt +
+ * shadow via graphicsLayer; FLAT quality = no-op.
+ */
+fun Modifier.card3D(tiltX: Float = 2f, quality: Quality3D = Quality3D.FULL): Modifier =
+    if (quality == Quality3D.FLAT) this else this.graphicsLayer {
+        cameraDistance = 8f * density
+        rotationX = tiltX
+    }
+
+/**
+ * tiltOnTouch: element tilts TOWARD the touch point (like pressing the
+ * edge of a physical plate). Pass normalized touch pos (-1..1 per axis).
+ */
+fun Modifier.tiltOnTouch(tx: Float, ty: Float, maxDeg: Float = 8f, enabled: Boolean = true): Modifier =
+    if (!enabled) this else this.graphicsLayer {
+        cameraDistance = 8f * density
+        rotationY = tx.coerceIn(-1f, 1f) * maxDeg
+        rotationX = -ty.coerceIn(-1f, 1f) * maxDeg
+    }

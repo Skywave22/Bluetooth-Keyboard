@@ -45,6 +45,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.bluepilot.remote.ui.components.LocalReduceMotion
 import com.bluepilot.remote.ui.components.card3DTilt
+import com.bluepilot.remote.ui.components.carousel3D
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -100,10 +101,14 @@ fun ThemeGalleryScreen(
             "Glass × Material You" to listOf(BuiltInThemes.GLASS_YOU_DARK, BuiltInThemes.GLASS_YOU_LIGHT),
             "Hawaii Harmony" to listOf(BuiltInThemes.HAWAII_NIGHT, BuiltInThemes.HAWAII_DAY),
             "Cockpit HUD" to listOf(BuiltInThemes.COCKPIT_HUD, BuiltInThemes.DAY_FLIGHT),
-            "More" to listOf(BuiltInThemes.DARK_NEON, BuiltInThemes.OLED_BLACK, BuiltInThemes.MINIMAL_LIGHT)
+            "Gaming" to listOf(BuiltInThemes.DARK_NEON, BuiltInThemes.CYBERPUNK, BuiltInThemes.SYNTHWAVE, BuiltInThemes.TACTICAL),
+            "Ambient" to listOf(BuiltInThemes.GALAXY, BuiltInThemes.PASTEL, BuiltInThemes.CHROME),
+            "More" to listOf(BuiltInThemes.OLED_BLACK, BuiltInThemes.MINIMAL_LIGHT)
         )
 
+        val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
@@ -122,10 +127,19 @@ fun ThemeGalleryScreen(
                     )
                 }
                 items(specs, key = { it.id }) { spec ->
+                    // SECTION 6 - coverflow tilt from scroll position
+                    val idx = BuiltInThemes.ALL.indexOfFirst { it.id == spec.id } / 2
                     ThemeCard(
                         spec = spec,
                         isActive = spec.id == app.themeId,
-                        onApply = { viewModel.setThemeId(spec.id) }
+                        onApply = { viewModel.setThemeId(spec.id) },
+                        carouselModifier = androidx.compose.ui.Modifier.carousel3D(
+                            itemIndex = idx,
+                            firstVisible = gridState.firstVisibleItemIndex,
+                            firstVisibleOffsetPx = gridState.firstVisibleItemScrollOffset,
+                            itemHeightPx = 700f,
+                            enabled = !LocalReduceMotion.current
+                        )
                     )
                 }
             }
@@ -137,7 +151,8 @@ fun ThemeGalleryScreen(
 private fun ThemeCard(
     spec: AppThemeSpec,
     isActive: Boolean,
-    onApply: () -> Unit
+    onApply: () -> Unit,
+    carouselModifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
 ) {
     val localTheme = LocalAppTheme.current
     val borderGlowColor = spec.glowColor ?: spec.primary
@@ -216,7 +231,6 @@ private fun ThemeMiniPreview(spec: AppThemeSpec, modifier: Modifier = Modifier) 
     Box(
         modifier = modifier
             .background(spec.background, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-            .clickable(enabled = false) {}
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val maxEdge = max(size.width, size.height)

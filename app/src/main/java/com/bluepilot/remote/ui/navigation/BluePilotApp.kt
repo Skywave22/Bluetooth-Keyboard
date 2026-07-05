@@ -32,6 +32,7 @@ import com.bluepilot.remote.ui.screens.gamepad.GamepadScreen
 import com.bluepilot.remote.ui.screens.fullkeyboard.FullKeyboardScreen
 import com.bluepilot.remote.ui.screens.airmouse.AirMouseScreen
 import com.bluepilot.remote.ui.screens.pccombo.PcComboScreen
+import com.bluepilot.remote.ui.screens.preview3d.Preview3DScreen
 import com.bluepilot.remote.ui.screens.gamepadbuilder.GamepadBuilderScreen
 import com.bluepilot.remote.ui.screens.help.HelpScreen
 import com.bluepilot.remote.ui.screens.keyboard.KeyboardScreen
@@ -76,6 +77,7 @@ object Routes {
     const val FULL_KEYBOARD = "full_keyboard"
     const val PC_COMBO = "pc_combo"
     const val AIR_MOUSE = "air_mouse"
+    const val PREVIEW_3D = "preview_3d"
 }
 
 @Composable
@@ -140,7 +142,8 @@ fun BluePilotApp() {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenThemes = { navController.navigate(Routes.THEMES) }
+                onOpenThemes = { navController.navigate(Routes.THEMES) },
+                onOpen3DPreview = { navController.navigate(Routes.PREVIEW_3D) }
             )
         }
         composable(Routes.MOUSE) { MouseScreen(onBack = { navController.popBackStack() }) }
@@ -162,6 +165,7 @@ fun BluePilotApp() {
         composable(Routes.FULL_KEYBOARD) { FullKeyboardScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.PC_COMBO) { PcComboScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.AIR_MOUSE) { AirMouseScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.PREVIEW_3D) { Preview3DScreen(onBack = { navController.popBackStack() }) }
         composable(
             route = "${Routes.LAYOUT_EDITOR}/{profileId}",
             arguments = listOf(navArgument("profileId") { type = NavType.LongType })

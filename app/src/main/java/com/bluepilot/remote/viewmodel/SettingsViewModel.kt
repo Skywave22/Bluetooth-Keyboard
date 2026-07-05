@@ -63,6 +63,8 @@ class SettingsViewModel @Inject constructor(
     fun setSecureScreen(value: Boolean) = updateApp { it.copy(secureScreen = value) }
     fun setOnboardingDone() = updateApp { it.copy(onboardingDone = true) }
     fun setReduceMotion(value: Boolean) = updateApp { it.copy(reduceMotion = value) }
+    fun setIconPack(value: String) = updateApp { it.copy(iconPack = value) }
+    fun setQuality3D(value: String) = updateApp { it.copy(quality3D = value) }
 
     // ----- Mouse -----
     fun setMouseSensitivity(value: Int) = updateMouse { it.copy(sensitivity = value) }

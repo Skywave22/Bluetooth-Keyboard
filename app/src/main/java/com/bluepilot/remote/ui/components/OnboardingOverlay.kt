@@ -61,7 +61,15 @@ fun OnboardingOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.72f))
-                .clickable(enabled = false) {}, // swallow touches behind
+                // BUGFIX: enabled=false does NOT consume touches - taps leaked
+                // through to the screen behind. An enabled no-op click without
+                // ripple properly swallows everything.
+                .clickable(
+                    interactionSource = androidx.compose.runtime.remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null
+                ) {},
             contentAlignment = Alignment.Center
         ) {
             GlassCard(modifier = Modifier.padding(28.dp)) {

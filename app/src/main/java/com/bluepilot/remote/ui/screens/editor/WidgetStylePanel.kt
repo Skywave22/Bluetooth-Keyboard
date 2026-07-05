@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.unit.dp
 import com.bluepilot.remote.model.HidConsumer
 import com.bluepilot.remote.model.HidKeys
@@ -199,7 +200,7 @@ private fun ColorRow(selected: Long, onPick: (Long) -> Unit) {
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
     ) {
         palette.forEach { argb ->
-            val color = Color(argb.toULong().toLong() and 0xFFFFFFFF)
+            val color = argb.toComposeColor()
             Box(
                 modifier = Modifier
                     .size(34.dp)

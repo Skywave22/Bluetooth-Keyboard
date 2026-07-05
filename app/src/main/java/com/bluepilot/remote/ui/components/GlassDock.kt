@@ -12,11 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Dashboard
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.Settings
+
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,8 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.shadow
 
 /**
  * UI/UX REDESIGN — Floating glass bottom dock (the pill dock from the
@@ -37,13 +33,13 @@ import androidx.compose.ui.unit.dp
  * controller app used in portrait AND landscape — thumb-reachable tabs
  * beat a hidden drawer for its core loop (pick a control surface fast).
  */
-data class DockItem(val route: String, val label: String, val icon: ImageVector)
+data class DockItem(val route: String, val label: String, val icon: AppIcon)
 
 val DockItems = listOf(
-    DockItem("home", "Home", Icons.Rounded.Home),
-    DockItem("layouts", "Layouts", Icons.Rounded.Dashboard),
-    DockItem("devices", "Devices", Icons.Rounded.Computer),
-    DockItem("settings", "Settings", Icons.Rounded.Settings)
+    DockItem("home", "Home", AppIcon.HOME),
+    DockItem("layouts", "Layouts", AppIcon.LAYOUTS),
+    DockItem("devices", "Devices", AppIcon.DEVICES),
+    DockItem("settings", "Settings", AppIcon.SETTINGS)
 )
 
 @Composable
@@ -55,7 +51,8 @@ fun GlassDock(
     GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 40.dp, vertical = 10.dp),
+            .padding(horizontal = 40.dp, vertical = 10.dp)
+            .shadow(DepthLayer.FLOATING, CircleShape, clip = false),
         shape = CircleShape
     ) {
         Row(
@@ -91,7 +88,7 @@ fun GlassDock(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(item.icon, contentDescription = item.label, tint = tint, modifier = Modifier.size(22.dp))
+                        Icon(iconFor(item.icon, LocalIconPack.current), contentDescription = item.label, tint = tint, modifier = Modifier.size(22.dp))
                     }
                     Text(item.label, style = MaterialTheme.typography.bodyMedium, color = tint)
                 }
