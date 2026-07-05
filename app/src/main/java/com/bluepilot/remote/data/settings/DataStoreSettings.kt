@@ -54,6 +54,8 @@ class DataStoreSettings @Inject constructor(
         val SECURE_SCREEN = booleanPreferencesKey("secure_screen")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+        val ICON_PACK = stringPreferencesKey("icon_pack")
+        val QUALITY_3D = stringPreferencesKey("quality_3d")
         // Mouse
         val M_SENSITIVITY = intPreferencesKey("m_sensitivity")
         val M_SCROLL = intPreferencesKey("m_scroll")
@@ -95,7 +97,9 @@ class DataStoreSettings @Inject constructor(
             hapticIntensity = p[Keys.HAPTIC_INTENSITY].toEnum(HapticIntensity.MEDIUM),
             secureScreen = p[Keys.SECURE_SCREEN] ?: false,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
-            reduceMotion = p[Keys.REDUCE_MOTION] ?: false
+            reduceMotion = p[Keys.REDUCE_MOTION] ?: false,
+            iconPack = p[Keys.ICON_PACK] ?: "ROUNDED",
+            quality3D = p[Keys.QUALITY_3D] ?: "FULL"
         )
     }
 
@@ -138,6 +142,8 @@ class DataStoreSettings @Inject constructor(
             p[Keys.SECURE_SCREEN] = settings.secureScreen
             p[Keys.ONBOARDING_DONE] = settings.onboardingDone
             p[Keys.REDUCE_MOTION] = settings.reduceMotion
+            p[Keys.ICON_PACK] = settings.iconPack
+            p[Keys.QUALITY_3D] = settings.quality3D
         }
     }
 

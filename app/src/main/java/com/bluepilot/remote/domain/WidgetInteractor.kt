@@ -1,6 +1,5 @@
 package com.bluepilot.remote.domain
 
-import com.bluepilot.remote.hid.PointerMath
 import com.bluepilot.remote.model.HidAction
 import com.bluepilot.remote.model.HidKeys
 import com.bluepilot.remote.model.MouseButton
@@ -47,38 +46,19 @@ class WidgetInteractor(
         }
     }
 
-    // ------------------------------------------------------------------
-    // Trackpad (same math as the Mouse screen)
-    // ------------------------------------------------------------------
+    // OPTIMIZATION: shared TrackpadEngine replaces the copy-pasted
+    // smoothing/carry pipeline (was ~35 lines here).
+    private val trackpad = TrackpadEngine(mouseSettings)
 
-    private var smoothX = 0f
-    private var smoothY = 0f
-    private var fracX = 0f
-    private var fracY = 0f
-    private var scrollAccum = 0f
-
-    fun trackpadStart() {
-        smoothX = 0f; smoothY = 0f; fracX = 0f; fracY = 0f
-    }
+    fun trackpadStart() = trackpad.startGesture()
 
     fun trackpadDelta(dx: Float, dy: Float) {
-        val s = mouseSettings()
-        val g = PointerMath.gain(s.sensitivity, s.penMode)
-        smoothX = PointerMath.smooth(smoothX, dx * g, s.movementSmoothing)
-        smoothY = PointerMath.smooth(smoothY, dy * g, s.movementSmoothing)
-        val fx = smoothX + fracX
-        val fy = smoothY + fracY
-        val ix = fx.toInt(); val iy = fy.toInt()
-        fracX = fx - ix; fracY = fy - iy
+        val (ix, iy) = trackpad.move(dx, dy)
         if (ix != 0 || iy != 0) send(HidAction.MouseMove(ix, iy))
     }
 
     fun scrollDelta(dy: Float) {
-        val s = mouseSettings()
-        scrollAccum += dy
-        val (steps, remainder) = PointerMath.scrollSteps(scrollAccum, s.scrollSpeed, s.invertScroll)
-        scrollAccum = remainder
-        if (steps != 0) send(HidAction.MouseScroll(steps))
+        trackpad.scroll(dy).takeIf { it != 0 }?.let { send(HidAction.MouseScroll(it)) }
     }
 
     /** Joystick in custom layouts drives the mouse pointer. */

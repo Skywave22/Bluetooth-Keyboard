@@ -26,7 +26,11 @@ data class AppSettings(
     /** First-run onboarding shown & dismissed (UI/UX redesign). */
     val onboardingDone: Boolean = false,
     /** Disable 3D tilts/parallax/flip transitions (accessibility/battery). */
-    val reduceMotion: Boolean = false
+    val reduceMotion: Boolean = false,
+    /** 3D quality: FULL / REDUCED / FLAT (Section 9). */
+    val quality3D: String = "FULL",
+    /** Icon pack style: FILLED / OUTLINED / ROUNDED / SHARP. */
+    val iconPack: String = "ROUNDED"
 )
 
 /** Mouse/trackpad tuning. All percentages 0..100. */

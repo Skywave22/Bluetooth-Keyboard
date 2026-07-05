@@ -15,7 +15,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.ThemeMode
 import com.bluepilot.remote.ui.components.LocalHapticIntensity
+import com.bluepilot.remote.ui.components.IconPack
+import com.bluepilot.remote.ui.components.LocalIconPack
+import com.bluepilot.remote.ui.components.LocalQuality3D
 import com.bluepilot.remote.ui.components.LocalReduceMotion
+import com.bluepilot.remote.ui.components.Quality3D
 import com.bluepilot.remote.ui.navigation.BluePilotApp
 import com.bluepilot.remote.ui.theme.BluePilotAppTheme
 import com.bluepilot.remote.ui.theme.BuiltInThemes
@@ -80,9 +84,13 @@ class MainActivity : ComponentActivity() {
             }
 
             BluePilotAppTheme(spec = spec) {
+                val iconPack = runCatching { IconPack.valueOf(app.iconPack) }
+                    .getOrDefault(IconPack.ROUNDED)
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalHapticIntensity provides app.hapticIntensity,
-                    LocalReduceMotion provides app.reduceMotion
+                    LocalReduceMotion provides app.reduceMotion,
+                    LocalIconPack provides iconPack,
+                    LocalQuality3D provides runCatching { Quality3D.valueOf(app.quality3D) }.getOrDefault(Quality3D.FULL)
                 ) {
                     ThemedBackground {
                         BluePilotApp()

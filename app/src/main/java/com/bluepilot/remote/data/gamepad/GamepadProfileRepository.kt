@@ -87,6 +87,8 @@ class GamepadProfileRepository @Inject constructor(
             if (dao.count() > 0) return
             save(null, fpsLayout(), isBuiltIn = true)
             save(null, racingLayout(), isBuiltIn = true)
+            save(null, fightingLayout(), isBuiltIn = true)
+            save(null, casualLayout(), isBuiltIn = true)
             Timber.i("seeded built-in gamepad profiles")
         }.onFailure { Timber.e(it, "gamepad seeding failed") }
     }
@@ -143,6 +145,39 @@ class GamepadProfileRepository @Inject constructor(
                 frame = WidgetFrame(0.35f, 0.06f, 0.10f, 0.12f),
                 shape = ControlShape.ROUNDED, label = "Sel", buttonIndex = 8, color = 0xFF1A2238
             )
+        )
+    )
+
+    /** "Fighting Layout": dpad + 6 attack buttons in arcade arrangement. */
+    internal fun fightingLayout() = GamepadLayoutSpec(
+        name = "Fighting Layout",
+        controls = listOf(
+            GamepadControlSpec(
+                id = "fg-dpad", type = GamepadControlType.DPAD,
+                frame = WidgetFrame(0.04f, 0.30f, 0.24f, 0.55f),
+                color = 0xFF1A2238, eightWay = true
+            ),
+            btn("fg-lp", 0.55f, 0.25f, 0.09f, "LP", 2, 0xFF29C5FF),
+            btn("fg-mp", 0.68f, 0.20f, 0.09f, "MP", 3, 0xFFF1C40F),
+            btn("fg-hp", 0.81f, 0.20f, 0.09f, "HP", 5, 0xFFE67E22),
+            btn("fg-lk", 0.55f, 0.60f, 0.09f, "LK", 0, 0xFF2ECC71),
+            btn("fg-mk", 0.68f, 0.65f, 0.09f, "MK", 1, 0xFFE74C3C),
+            btn("fg-hk", 0.81f, 0.65f, 0.09f, "HK", 7, 0xFFFF2D95)
+        )
+    )
+
+    /** "Casual Layout": dpad + 2 big action buttons for browser games. */
+    internal fun casualLayout() = GamepadLayoutSpec(
+        name = "Casual Layout",
+        controls = listOf(
+            GamepadControlSpec(
+                id = "cs-dpad", type = GamepadControlType.DPAD,
+                frame = WidgetFrame(0.05f, 0.30f, 0.26f, 0.55f),
+                color = 0xFF1A2238, eightWay = false
+            ),
+            btn("cs-a", 0.72f, 0.55f, 0.13f, "JUMP", 0, 0xFF2ECC71),
+            btn("cs-b", 0.86f, 0.35f, 0.11f, "FIRE", 1, 0xFFE74C3C),
+            btn("cs-x", 0.60f, 0.30f, 0.09f, "X", 2, 0xFF29C5FF)
         )
     )
 
