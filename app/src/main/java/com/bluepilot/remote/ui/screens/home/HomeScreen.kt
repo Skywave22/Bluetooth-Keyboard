@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.MusicNote
@@ -32,8 +30,6 @@ import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Slideshow
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -165,7 +161,7 @@ fun HomeScreen(
                     columns = GridCells.Fixed(2),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 96.dp), // Space to scroll past floating dock
+                    contentPadding = PaddingValues(bottom = 128.dp), // Space to scroll past floating dock + gesture bar
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(tiles) { tile ->
@@ -184,49 +180,10 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // Floating pill-shaped glass bottom dock (Home / Devices / Settings)
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp)
-            ) {
-                GlassCard(
-                    shape = CircleShape,
-                    modifier = Modifier.height(58.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        IconButton(onClick = {}) {
-                            Icon(
-                                imageVector = Icons.Rounded.Home,
-                                contentDescription = "Home",
-                                tint = spec.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        IconButton(onClick = { onNavigate(Routes.CONNECTION) }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Bluetooth,
-                                contentDescription = "Devices",
-                                tint = spec.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        IconButton(onClick = { onNavigate(Routes.SETTINGS) }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Settings,
-                                contentDescription = "Settings",
-                                tint = spec.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            // NOTE: the old in-screen dock was removed — the app-level
+            // GlassDock (BluePilotApp) is the single bottom dock now.
+            // Having both stacked caused ghost icons to peek out behind
+            // the floating dock (bug reported via screenshot).
         }
     }
 }
@@ -251,7 +208,9 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
     val gel = tile.gel.toComposeColor()
 
     GlassCard(
-        modifier = Modifier.clickable(enabled = enabled, onClick = onClick)
+        modifier = Modifier
+            .androidGraphicsFloat(phase, !reduceMotion)
+            .clickable(enabled = enabled, onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             GelIcon(

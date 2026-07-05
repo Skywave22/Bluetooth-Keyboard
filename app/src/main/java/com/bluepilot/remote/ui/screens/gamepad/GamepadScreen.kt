@@ -1,6 +1,9 @@
 package com.bluepilot.remote.ui.screens.gamepad
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -126,13 +133,14 @@ fun GamepadScreen(
                         FaceButton("L1") { pressed -> viewModel.onGamepadButton(GamepadButton.L1, pressed); if (pressed) haptic() }
                         FaceButton("R1") { pressed -> viewModel.onGamepadButton(GamepadButton.R1, pressed); if (pressed) haptic() }
                     }
-                    // ABXY diamond
-                    FaceButton("Y") { pressed -> viewModel.onGamepadButton(GamepadButton.Y, pressed); if (pressed) haptic() }
+                    // ABXY diamond — classic controller colors (Y amber,
+                    // X blue, B red, A green) with 3D gel shading.
+                    FaceButton("Y", tint = Color(0xFFF5A623)) { pressed -> viewModel.onGamepadButton(GamepadButton.Y, pressed); if (pressed) haptic() }
                     Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-                        FaceButton("X") { pressed -> viewModel.onGamepadButton(GamepadButton.X, pressed); if (pressed) haptic() }
-                        FaceButton("B") { pressed -> viewModel.onGamepadButton(GamepadButton.B, pressed); if (pressed) haptic() }
+                        FaceButton("X", tint = Color(0xFF2F6BFF)) { pressed -> viewModel.onGamepadButton(GamepadButton.X, pressed); if (pressed) haptic() }
+                        FaceButton("B", tint = Color(0xFFE74C3C)) { pressed -> viewModel.onGamepadButton(GamepadButton.B, pressed); if (pressed) haptic() }
                     }
-                    FaceButton("A", emphasized = true) { pressed -> viewModel.onGamepadButton(GamepadButton.A, pressed); if (pressed) haptic() }
+                    FaceButton("A", tint = Color(0xFF2ECC71)) { pressed -> viewModel.onGamepadButton(GamepadButton.A, pressed); if (pressed) haptic() }
                 }
             }
 
@@ -171,10 +179,22 @@ private fun VirtualStick(
     val radiusPx = with(density) { (baseSize - knobSize).toPx() / 2f }
     var knob by remember { mutableStateOf(Offset.Zero) }
 
+    val well = MaterialTheme.colorScheme.surfaceVariant
     Box(
         modifier = Modifier
             .size(baseSize)
-            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+            // Recessed "well" look: dark rim at top (inner shadow illusion).
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Black.copy(alpha = 0.18f).compositeOver(well),
+                        well,
+                        Color.White.copy(alpha = 0.08f).compositeOver(well)
+                    )
+                ),
+                CircleShape
+            )
+            .border(1.dp, Color.Black.copy(alpha = 0.12f), CircleShape)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragEnd = { knob = Offset.Zero; onRelease() },
@@ -194,40 +214,86 @@ private fun VirtualStick(
             },
         contentAlignment = Alignment.Center
     ) {
+        val knobColor = MaterialTheme.colorScheme.primary
         Box(
             modifier = Modifier
                 .offset { IntOffset(knob.x.roundToInt(), knob.y.roundToInt()) }
                 .size(knobSize)
-                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                .graphicsLayer {
+                    shadowElevation = 6.dp.toPx()
+                    shape = CircleShape
+                    clip = false
+                }
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.30f).compositeOver(knobColor),
+                            knobColor,
+                            Color.Black.copy(alpha = 0.22f).compositeOver(knobColor)
+                        )
+                    ),
+                    CircleShape
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
         )
     }
 }
 
-/** Round press-and-release button reporting both press states. */
+/**
+ * Round press-and-release button reporting both press states.
+ * 3D gel look: colored radial gradient dome + top highlight + press-sink.
+ */
 @Composable
 private fun FaceButton(
     label: String,
-    emphasized: Boolean = false,
+    tint: Color? = null,
     onPress: (Boolean) -> Unit
 ) {
+    var pressed by remember { mutableStateOf(false) }
+    val sink by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 900f),
+        label = "faceBtnSink"
+    )
+    val base = tint ?: MaterialTheme.colorScheme.surfaceVariant
+    val labelColor = if (tint != null) Color.White else MaterialTheme.colorScheme.onSurface
+    // Dome shading: light hits top-left.
+    fun lighten(c: Color, f: Float) = Color(
+        (c.red + (1 - c.red) * f), (c.green + (1 - c.green) * f), (c.blue + (1 - c.blue) * f), c.alpha
+    )
+    fun darken(c: Color, f: Float) = Color(c.red * (1 - f), c.green * (1 - f), c.blue * (1 - f), c.alpha)
+
     Box(
         modifier = Modifier
             .size(56.dp)
+            .graphicsLayer {
+                val s = 1f - 0.06f * sink
+                scaleX = s; scaleY = s
+                translationY = 2.dp.toPx() * sink
+                shadowElevation = (6.dp.toPx()) * (1f - sink)
+                shape = CircleShape
+                clip = false
+                if (tint != null) { spotShadowColor = tint; ambientShadowColor = tint }
+            }
             .background(
-                if (emphasized) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceVariant,
+                Brush.verticalGradient(
+                    colors = listOf(lighten(base, 0.30f), base, darken(base, 0.25f))
+                ),
                 CircleShape
             )
+            .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitPointerEvent()
                         if (down.changes.any { it.pressed }) {
+                            pressed = true
                             onPress(true)
                             // Wait for release
                             do {
                                 val event = awaitPointerEvent()
                             } while (event.changes.any { it.pressed })
+                            pressed = false
                             onPress(false)
                         }
                     }
@@ -238,8 +304,7 @@ private fun FaceButton(
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            color = if (emphasized) MaterialTheme.colorScheme.onPrimary
-            else MaterialTheme.colorScheme.onSurface
+            color = labelColor
         )
     }
 }
@@ -262,19 +327,45 @@ private fun DpadCluster(
 
 @Composable
 private fun DpadKey(label: String, onPressChange: (Boolean) -> Unit) {
+    var pressed by remember { mutableStateOf(false) }
+    val sink by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 900f),
+        label = "dpadSink"
+    )
+    val base = MaterialTheme.colorScheme.surfaceVariant
     Box(
         modifier = Modifier
             .size(44.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+            .graphicsLayer {
+                val s = 1f - 0.07f * sink
+                scaleX = s; scaleY = s
+                shadowElevation = 4.dp.toPx() * (1f - sink)
+                shape = CircleShape
+                clip = false
+            }
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.16f).compositeOver(base),
+                        base,
+                        Color.Black.copy(alpha = 0.14f).compositeOver(base)
+                    )
+                ),
+                CircleShape
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitPointerEvent()
                         if (down.changes.any { it.pressed }) {
+                            pressed = true
                             onPressChange(true)
                             do {
                                 val event = awaitPointerEvent()
                             } while (event.changes.any { it.pressed })
+                            pressed = false
                             onPressChange(false)
                         }
                     }

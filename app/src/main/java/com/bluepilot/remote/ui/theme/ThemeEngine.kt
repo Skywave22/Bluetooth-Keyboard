@@ -23,6 +23,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
@@ -53,10 +54,19 @@ fun BluePilotAppTheme(
     val glassSurface = spec.surface.copy(alpha = spec.surfaceAlpha)
     val glassVariant = spec.surfaceVariant.copy(alpha = spec.surfaceAlpha)
 
+    // FIX (screenshot bug): container colors must be OPAQUE. Translucent
+    // containers on elevated Cards let the shadow show THROUGH the surface,
+    // rendering an ugly dark "box inside a box" on emphasized keys
+    // (ENTER / LEFT CLICK). Composite the tint over the surface instead.
+    val primaryContainerC =
+        spec.primary.copy(alpha = if (spec.isDark) 0.75f else 0.15f).compositeOver(spec.surface)
+    val errorContainerC =
+        spec.error.copy(alpha = if (spec.isDark) 0.25f else 0.15f).compositeOver(spec.surface)
+
     val scheme = if (spec.isDark) {
         darkColorScheme(
             primary = spec.primary, onPrimary = spec.onPrimary,
-            primaryContainer = spec.primary.copy(alpha = 0.75f),
+            primaryContainer = primaryContainerC,
             onPrimaryContainer = spec.onPrimary,
             secondary = spec.secondary, onSecondary = spec.onPrimary,
             background = spec.background, onBackground = spec.onBackground,
@@ -64,12 +74,12 @@ fun BluePilotAppTheme(
             surfaceVariant = glassVariant, onSurfaceVariant = spec.onSurfaceVariant,
             outline = spec.outline,
             error = spec.error, onError = spec.onPrimary,
-            errorContainer = spec.error.copy(alpha = 0.25f), onErrorContainer = spec.onBackground
+            errorContainer = errorContainerC, onErrorContainer = spec.onBackground
         )
     } else {
         lightColorScheme(
             primary = spec.primary, onPrimary = spec.onPrimary,
-            primaryContainer = spec.primary.copy(alpha = 0.15f),
+            primaryContainer = primaryContainerC,
             onPrimaryContainer = spec.primary,
             secondary = spec.secondary, onSecondary = spec.onPrimary,
             background = spec.background, onBackground = spec.onBackground,
@@ -77,7 +87,7 @@ fun BluePilotAppTheme(
             surfaceVariant = glassVariant, onSurfaceVariant = spec.onSurfaceVariant,
             outline = spec.outline,
             error = spec.error, onError = spec.onPrimary,
-            errorContainer = spec.error.copy(alpha = 0.15f), onErrorContainer = spec.error
+            errorContainer = errorContainerC, onErrorContainer = spec.error
         )
     }
 
