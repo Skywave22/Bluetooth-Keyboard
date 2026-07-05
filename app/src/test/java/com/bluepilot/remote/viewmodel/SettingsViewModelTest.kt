@@ -52,6 +52,12 @@ class SettingsViewModelTest {
 
     private lateinit var store: FakeStore
 
+    /** No-op haptics for JVM tests. */
+    private val fakeHaptics = object : com.bluepilot.remote.haptics.Haptics {
+        override var intensityScale: Float = 0.6f
+        override fun play(pattern: com.bluepilot.remote.model.gamepad.HapticPattern) {}
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -65,7 +71,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `theme change persists`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setTheme(ThemeMode.DARK)
         advanceUntilIdle()
@@ -75,7 +81,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `secure screen toggle persists`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setSecureScreen(true)
         advanceUntilIdle()
@@ -84,7 +90,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `mouse sensitivity out of range is sanitized on write`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setMouseSensitivity(400)   // slider bug / bad input
         advanceUntilIdle()
@@ -93,7 +99,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `gamepad mode change persists`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setGamepadMode(GamepadMappingMode.MOUSE_KEYBOARD)
         advanceUntilIdle()
@@ -102,7 +108,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `dead zone above cap is clamped`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setDeadZone(99)
         advanceUntilIdle()
@@ -111,7 +117,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `keyboard text bar toggle persists`() = runTest(dispatcher) {
-        val vm = SettingsViewModel(store)
+        val vm = SettingsViewModel(store, fakeHaptics)
         advanceUntilIdle()
         vm.setShowTextInputBar(false)
         advanceUntilIdle()
