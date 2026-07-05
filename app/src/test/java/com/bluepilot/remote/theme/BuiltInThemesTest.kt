@@ -14,7 +14,7 @@ class BuiltInThemesTest {
 
     @Test
     fun `catalog has all thirteen design themes`() {
-        assertTrue(BuiltInThemes.ALL.size >= 13)
+        assertTrue(BuiltInThemes.ALL.size >= 19)
     }
 
     @Test
