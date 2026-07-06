@@ -40,6 +40,22 @@ class LayoutsViewModel @Inject constructor(
     val profiles: StateFlow<List<LayoutProfile>> = repository.observeProfiles()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    // SECTION 2 — profile list search/filter (name, category, notes).
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+    fun setSearchQuery(q: String) { _searchQuery.value = q }
+
+    /** Profiles filtered by the search query, grouped by category. */
+    val filteredProfiles: StateFlow<List<LayoutProfile>> =
+        kotlinx.coroutines.flow.combine(profiles, _searchQuery) { list, q ->
+            if (q.isBlank()) list
+            else list.filter {
+                it.spec.name.contains(q, true) ||
+                    it.spec.category.contains(q, true) ||
+                    it.spec.notes.contains(q, true)
+            }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val isConnected: StateFlow<Boolean> = observeConnection()
         .map { it.isConnected }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

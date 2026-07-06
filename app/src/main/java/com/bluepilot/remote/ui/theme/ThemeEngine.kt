@@ -104,14 +104,49 @@ fun BluePilotAppTheme(
     // Cockpit HUD themes flip the type ramp to monospace.
     val typography = if (spec.monoFont) monoTypography() else BluePilotTypography
 
+    // SECTION 1 — smooth animated theme switch: every scheme color
+    // cross-dissolves (350ms) instead of snapping. Content is NOT
+    // recreated (nav/back-stack state survives). Skipped for the very
+    // first composition and under Reduce Motion.
+    val animated = animateColorScheme(scheme)
+
     CompositionLocalProvider(LocalAppTheme provides spec) {
         MaterialTheme(
-            colorScheme = scheme,
+            colorScheme = animated,
             typography = typography,
             shapes = shapes,
             content = content
         )
     }
+}
+
+/** Animates the 14 most visible scheme colors on theme change. */
+@Composable
+private fun animateColorScheme(target: androidx.compose.material3.ColorScheme): androidx.compose.material3.ColorScheme {
+    val reduce = com.bluepilot.remote.ui.components.LocalReduceMotion.current
+    if (reduce) return target
+    val spec = tween<androidx.compose.ui.graphics.Color>(350)
+
+    @Composable
+    fun c(color: androidx.compose.ui.graphics.Color) =
+        androidx.compose.animation.animateColorAsState(color, spec, label = "themeColor").value
+
+    return target.copy(
+        primary = c(target.primary),
+        onPrimary = c(target.onPrimary),
+        primaryContainer = c(target.primaryContainer),
+        onPrimaryContainer = c(target.onPrimaryContainer),
+        secondary = c(target.secondary),
+        background = c(target.background),
+        onBackground = c(target.onBackground),
+        surface = c(target.surface),
+        onSurface = c(target.onSurface),
+        surfaceVariant = c(target.surfaceVariant),
+        onSurfaceVariant = c(target.onSurfaceVariant),
+        outline = c(target.outline),
+        error = c(target.error),
+        errorContainer = c(target.errorContainer)
+    )
 }
 
 private fun monoTypography(): Typography {
@@ -136,6 +171,14 @@ fun ThemedBackground(
     val spec = LocalAppTheme.current
     val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current
 
+    // SECTION 1 — theme switch cross-dissolve for the backdrop itself,
+    // matching the animated Material scheme (no background "snap").
+    val bgColor by androidx.compose.animation.animateColorAsState(
+        targetValue = spec.background,
+        animationSpec = if (reduceMotion) tween(0) else tween(350),
+        label = "themedBg"
+    )
+
     // SECTION 3D — parallax depth: orbs drift slowly on offset phases so
     // background layers feel separated. Draw-phase only (reading the
     // animated value inside Canvas), zero recomposition per frame.
@@ -150,7 +193,7 @@ fun ThemedBackground(
         label = "orbPhase"
     )
 
-    Box(modifier = modifier.fillMaxSize().background(spec.background)) {
+    Box(modifier = modifier.fillMaxSize().background(bgColor)) {
         if (spec.backgroundOrbs.isNotEmpty()) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val maxEdge = max(size.width, size.height)

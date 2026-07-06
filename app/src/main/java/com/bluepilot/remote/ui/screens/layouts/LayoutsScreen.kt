@@ -68,7 +68,8 @@ fun LayoutsScreen(
     onEdit: (Long) -> Unit,
     viewModel: LayoutsViewModel = hiltViewModel()
 ) {
-    val profiles by viewModel.profiles.collectAsState()
+    val profiles by viewModel.filteredProfiles.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val active by viewModel.activeProfile.collectAsState()
     val isConnected by viewModel.isConnected.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -159,6 +160,7 @@ fun LayoutsScreen(
         ) { padding ->
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(8.dp)) {
                 NotConnectedBanner(!isConnected)
+                com.bluepilot.remote.ui.components.HintBar("Swipe the title bar left/right to switch layouts")
                 // Perf: remember(viewModel) — stable events object, so
                 // LayoutCanvas skips recomposition of unchanged widgets.
                 val canvasEvents = remember(viewModel) {
@@ -227,6 +229,16 @@ fun LayoutsScreen(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
+            // SECTION 2 — search/filter across name, category and notes.
+            item {
+                androidx.compose.material3.OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    singleLine = true,
+                    placeholder = { Text("Search layouts (name, category, notes)") },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                )
+            }
             items(profiles, key = { it.id }) { profile ->
                 Card(
                     modifier = Modifier
@@ -238,20 +250,27 @@ fun LayoutsScreen(
                         modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Dashboard,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        // SECTION 2 — auto thumbnail: real widget frames painted
+                        // at miniature scale (always in sync with the layout).
+                        LayoutThumbnail(spec = profile.spec)
                         Spacer(Modifier.size(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(profile.spec.name, style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = "${profile.spec.widgets.size} widgets" +
-                                    if (profile.isBuiltIn) "  •  built-in template" else "",
+                                    (if (profile.spec.category.isNotBlank()) "  •  ${profile.spec.category}" else "") +
+                                    (if (profile.isBuiltIn) "  •  built-in template" else ""),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (profile.spec.notes.isNotBlank()) {
+                                Text(
+                                    text = profile.spec.notes,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
                         }
                         IconButton(onClick = { onEdit(profile.id) }) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
@@ -270,6 +289,43 @@ fun LayoutsScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * SECTION 2 — auto-generated layout thumbnail: paints every widget frame
+ * as a rounded mini-rect at 1/8 scale. Pure Canvas (no bitmaps, no
+ * caching needed) and always pixel-true to the saved layout.
+ */
+@Composable
+private fun LayoutThumbnail(spec: com.bluepilot.remote.model.widgets.LayoutSpec) {
+    val bg = MaterialTheme.colorScheme.background
+    val outline = MaterialTheme.colorScheme.outline
+    val accent = MaterialTheme.colorScheme.primary
+    androidx.compose.foundation.Canvas(
+        modifier = Modifier
+            .size(width = 56.dp, height = 42.dp)
+    ) {
+        // Canvas backdrop
+        drawRoundRect(
+            color = bg,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+        )
+        drawRoundRect(
+            color = outline.copy(alpha = 0.5f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f)
+        )
+        // Widgets at fractional frames
+        spec.widgets.take(com.bluepilot.remote.model.widgets.LayoutSpec.MAX_WIDGETS).forEach { w ->
+            val f = w.frame
+            drawRoundRect(
+                color = accent.copy(alpha = 0.55f),
+                topLeft = androidx.compose.ui.geometry.Offset(f.x * size.width, f.y * size.height),
+                size = androidx.compose.ui.geometry.Size(f.w * size.width, f.h * size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f)
+            )
         }
     }
 }

@@ -54,8 +54,26 @@ class SettingsViewModel @Inject constructor(
 
     // ----- App -----
     fun setTheme(theme: ThemeMode) = updateApp { it.copy(theme = theme) }
-    fun setThemeId(id: String) = updateApp { it.copy(themeId = id) }
-        .also { haptics.play(com.bluepilot.remote.model.gamepad.HapticPattern.MEDIUM_CLICK) }
+
+    /** SECTION 1: applying a theme also records it in the recents row. */
+    fun setThemeId(id: String) = updateApp {
+        it.copy(
+            themeId = id,
+            recentThemes = com.bluepilot.remote.ui.theme.ThemeListCodec.push(it.recentThemes, id)
+        )
+    }.also { haptics.play(com.bluepilot.remote.model.gamepad.HapticPattern.MEDIUM_CLICK) }
+
+    /** SECTION 1: pin/unpin a theme in the favorites row. */
+    fun toggleFavoriteTheme(id: String) = updateApp {
+        it.copy(favoriteThemes = com.bluepilot.remote.ui.theme.ThemeListCodec.toggle(it.favoriteThemes, id))
+    }
+
+    // SECTION 1: auto theme scheduling.
+    fun setAutoTheme(enabled: Boolean) = updateApp { it.copy(autoThemeEnabled = enabled) }
+    fun setAutoDayTheme(id: String) = updateApp { it.copy(autoDayTheme = id) }
+    fun setAutoNightTheme(id: String) = updateApp { it.copy(autoNightTheme = id) }
+    fun setAutoNightStart(hour: Int) = updateApp { it.copy(autoNightStart = hour.coerceIn(0, 23)) }
+    fun setAutoNightEnd(hour: Int) = updateApp { it.copy(autoNightEnd = hour.coerceIn(0, 23)) }
     fun setFullscreen(value: Boolean) = updateApp { it.copy(fullscreenMode = value) }
     fun setKeepScreenOn(value: Boolean) = updateApp { it.copy(keepScreenOn = value) }
     fun setTouchVibrations(value: Boolean) = updateApp { it.copy(touchVibrations = value) }
@@ -75,8 +93,11 @@ class SettingsViewModel @Inject constructor(
     fun setPenMode(value: Boolean) = updateMouse { it.copy(penMode = value) }
 
     // ----- Keyboard -----
+    // SECTION 3 AUDIT FIX: copy the CURRENT settings instead of constructing
+    // a fresh KeyboardSettings() — the old code silently reset every other
+    // keyboard field to defaults (latent data-loss bug as fields grow).
     fun setShowTextInputBar(value: Boolean) =
-        viewModelScope.launch { store.updateKeyboard(KeyboardSettings(showTextInputBar = value)) }
+        viewModelScope.launch { store.updateKeyboard(keyboard.value.copy(showTextInputBar = value)) }
 
     // ----- Gamepad -----
     fun setGamepadMode(mode: GamepadMappingMode) = updateGamepad { it.copy(mappingMode = mode) }

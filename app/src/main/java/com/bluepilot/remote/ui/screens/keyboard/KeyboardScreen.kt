@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +57,7 @@ fun KeyboardScreen(
     val vibration by viewModel.vibrationsEnabled.collectAsState()
     val haptic = rememberHaptic(vibration)
     var text by remember { mutableStateOf("") }
+    var showVoiceSheet by remember { mutableStateOf(false) }   // ADV S4
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -89,6 +91,14 @@ fun KeyboardScreen(
                         placeholder = { Text("Type here, send to PC…") },
                         singleLine = true
                     )
+                    // ADV S4 — voice-to-text entry point.
+                    IconButton(onClick = { showVoiceSheet = true }) {
+                        Icon(
+                            Icons.Rounded.Mic,
+                            contentDescription = "Voice input",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = {
                         haptic()
                         viewModel.typeText(text)
@@ -200,6 +210,11 @@ fun KeyboardScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // ADV S4 — voice input sheet.
+    if (showVoiceSheet) {
+        com.bluepilot.remote.ui.components.VoiceInputSheet(onDismiss = { showVoiceSheet = false })
     }
 }
 

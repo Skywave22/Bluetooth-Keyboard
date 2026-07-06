@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mouse
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pin
@@ -89,6 +90,7 @@ private val tiles = listOf(
     HomeTile("Macros", "Record & play sequences", Icons.Rounded.Bolt, Routes.MACROS, gel = 0xFF57D163),
     HomeTile("Themes", "Change the whole look", Icons.Rounded.Palette, Routes.THEMES, gel = 0xFFB86BFF),
     HomeTile("Pad Builder", "Design your own gamepad", Icons.Rounded.SportsEsports, Routes.GAMEPAD_BUILDER, gel = 0xFF6E8BFF),
+    HomeTile("Health", "Live connection metrics", Icons.Rounded.MonitorHeart, Routes.CONNECTION_HEALTH, gel = 0xFF00C853),
     HomeTile("Settings", "Tune everything", Icons.Rounded.Settings, Routes.SETTINGS, gel = 0xFF8B9BB5),
     HomeTile("Help", "Pairing & troubleshooting", Icons.AutoMirrored.Rounded.HelpOutline, Routes.HELP, gel = 0xFF64B6F0)
 )
@@ -136,13 +138,13 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // Version Chip (v3.1.0)
+                    // Version Chip — reads BuildConfig so CI builds show their real version
                     GlassCard(
                         shape = CircleShape,
                         modifier = Modifier.padding(start = 8.dp)
                     ) {
                         Text(
-                            text = "3.1.0",
+                            text = com.bluepilot.remote.BuildConfig.VERSION_NAME,
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontFamily = if (spec.monoFont) FontFamily.Monospace else FontFamily.Default
                             ),
@@ -196,7 +198,10 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
     val reduceMotion = com.bluepilot.remote.ui.components.LocalReduceMotion.current ||
         com.bluepilot.remote.ui.components.LocalQuality3D.current == com.bluepilot.remote.ui.components.Quality3D.FLAT
     val floatAnim = rememberInfiniteTransition(label = "tileFloat")
-    val phase by floatAnim.animateFloat(
+    // SECTION 5 PERF FIX: keep the animated value as State and read it
+    // inside graphicsLayer (draw phase). Reading `phase` directly here
+    // recomposed every tile on every animation frame (16 tiles × 60fps).
+    val phaseState = floatAnim.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
             tween(3600 + (tile.title.hashCode() and 0x3FF), easing = androidx.compose.animation.core.LinearEasing),
@@ -209,7 +214,7 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
 
     GlassCard(
         modifier = Modifier
-            .androidGraphicsFloat(phase, !reduceMotion)
+            .androidGraphicsFloat(phaseState, !reduceMotion)
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -236,12 +241,16 @@ private fun HomeTileCard(tile: HomeTile, enabled: Boolean, onClick: () -> Unit) 
     }
 }
 
-/** SECTION 2 - idle 3D float: gentle vertical bob via graphicsLayer. */
+/**
+ * SECTION 2 - idle 3D float: gentle vertical bob via graphicsLayer.
+ * SECTION 5 PERF: takes State<Float> so the per-frame value is read in
+ * the draw phase only — animating costs zero recompositions.
+ */
 private fun androidx.compose.ui.Modifier.androidGraphicsFloat(
-    phase: Float, enabled: Boolean
+    phase: androidx.compose.runtime.State<Float>, enabled: Boolean
 ): androidx.compose.ui.Modifier =
     if (!enabled) this else this.then(
         androidx.compose.ui.Modifier.graphicsLayer {
-            translationY = kotlin.math.sin(phase * 2f * Math.PI).toFloat() * 3f * density
+            translationY = kotlin.math.sin(phase.value * 2f * Math.PI).toFloat() * 3f * density
         }
     )

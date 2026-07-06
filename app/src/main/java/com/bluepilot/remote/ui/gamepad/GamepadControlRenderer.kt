@@ -16,9 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import kotlinx.coroutines.launch
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.bluepilot.remote.ui.components.toComposeColor
@@ -53,19 +56,43 @@ interface GamepadEvents {
     /** dx/dy relative to pad center, -1..1; NaN never sent. */
     fun onDpadTouch(control: GamepadControlSpec, dx: Float, dy: Float)
     fun onDpadRelease(control: GamepadControlSpec)
+
+    // ----- ADV SECTION 1 (defaults keep old callers compiling) -----
+    /** Toggle-mode button tapped (latch flips in the VM). */
+    fun onToggle(control: GamepadControlSpec) {}
+    /** Multi-tap button tapped (VM resolves single vs double). */
+    fun onMultiTap(control: GamepadControlSpec) {}
+    /** Radial wheel option picked. */
+    fun onRadialPick(control: GamepadControlSpec, index: Int) {}
+    /** Independent arrow pressed/released. */
+    fun onArrow(control: GamepadControlSpec, pressed: Boolean) {}
+    /** Combo double-zone: zone 0 = top(bumper), 1 = bottom(trigger). */
+    fun onComboZone(control: GamepadControlSpec, zone: Int, pressed: Boolean) {}
+    /** Stick click (L3/R3) via long-press on the knob. */
+    fun onStickClick(control: GamepadControlSpec, pressed: Boolean) {}
 }
 
-/** Renders a full custom gamepad layout at fractional positions. */
+/**
+ * Renders a full custom gamepad layout at fractional positions.
+ * ADV S2 — [activeLayer]: layer-0 controls always render (dimmed while the
+ * shift layer is active); layer-1 controls only render when activeLayer==1.
+ * The shift control itself always renders highlighted.
+ */
 @Composable
 fun GamepadCanvas(
     layout: GamepadLayoutSpec,
     events: GamepadEvents,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    activeLayer: Int = 0
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val w = maxWidth
         val h = maxHeight
         layout.controls.forEach { control ->
+            val isShiftKey = control.id == layout.shiftControlId
+            val visible = control.layer == 0 || control.layer == activeLayer || isShiftKey
+            if (!visible) return@forEach
+            val dimmed = activeLayer == 1 && control.layer == 0 && !isShiftKey
             val frame = control.frame.sanitized()
             RenderGamepadControl(
                 control = control,
@@ -73,6 +100,7 @@ fun GamepadCanvas(
                 modifier = Modifier
                     .offset(x = w * frame.x, y = h * frame.y)
                     .size(width = w * frame.w, height = h * frame.h)
+                    .graphicsLayer { if (dimmed) alpha = 0.35f }
             )
         }
     }
@@ -86,9 +114,21 @@ fun RenderGamepadControl(
 ) {
     when (control.type) {
         GamepadControlType.BUTTON, GamepadControlType.TRIGGER ->
-            PressableControl(control, events, modifier)
+            when (control.buttonMode) {
+                com.bluepilot.remote.model.gamepad.ButtonMode.TOGGLE ->
+                    ToggleControl(control, events, modifier)
+                com.bluepilot.remote.model.gamepad.ButtonMode.MULTI_TAP ->
+                    MultiTapControl(control, events, modifier)
+                com.bluepilot.remote.model.gamepad.ButtonMode.SLIDE ->
+                    SlideControl(control, events, modifier)
+                com.bluepilot.remote.model.gamepad.ButtonMode.RADIAL ->
+                    RadialControl(control, events, modifier)
+                else -> PressableControl(control, events, modifier)
+            }
         GamepadControlType.STICK -> StickControl(control, events, modifier)
         GamepadControlType.DPAD -> DpadControl(control, events, modifier)
+        GamepadControlType.ARROW -> ArrowControl(control, events, modifier)
+        GamepadControlType.COMBO -> ComboControl(control, events, modifier)
     }
 }
 
@@ -187,7 +227,11 @@ private fun PressableControl(
     }
 }
 
-/** Analog stick: knob follows finger inside base circle; snaps to center. */
+/**
+ * Analog stick: knob follows finger inside the gate; snaps to center
+ * (or stays — ADV S1 sticky mode). Supports square gate, 8-direction
+ * guide overlay, outer-range ring and stick-click (long-press = L3/R3).
+ */
 @Composable
 private fun StickControl(
     control: GamepadControlSpec,
@@ -198,23 +242,91 @@ private fun StickControl(
         val baseMin = if (maxWidth < maxHeight) maxWidth else maxHeight
         val knobSize = baseMin * 0.42f
         val density = LocalDensity.current
-        val radiusPx = with(density) { ((baseMin - knobSize) / 2f).toPx() }.coerceAtLeast(1f)
+        val squareGate = control.stickGate == com.bluepilot.remote.model.gamepad.StickGate.SQUARE
+        val radiusPx = (with(density) { ((baseMin - knobSize) / 2f).toPx() } *
+            control.outerRange.coerceIn(0.5f, 1f)).coerceAtLeast(1f)
         var knob by remember { mutableStateOf(Offset.Zero) }
         val base = controlColor(control)
+        val gateShape = if (squareGate) RoundedCornerShape(12.dp) else CircleShape
+
+        // ADV S1 — stick click: long-press (>350ms) without movement = L3/R3.
+        var clickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+        val clickScope = androidx.compose.runtime.rememberCoroutineScope()
+        var clickSent by remember { mutableStateOf(false) }
 
         Box(
             modifier = Modifier
                 .size(baseMin)
-                .background(base.copy(alpha = base.alpha * 0.4f), CircleShape)
+                .background(base.copy(alpha = base.alpha * 0.4f), gateShape)
+                // ADV S1 — 8-direction guide-line overlay (toggleable).
+                .then(if (control.stickGuides) Modifier.drawBehind {
+                    val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    val r = size.minDimension / 2f
+                    for (i in 0 until 8) {
+                        val a = Math.PI / 4 * i
+                        drawLine(
+                            color = Color.White.copy(alpha = if (i % 2 == 0) 0.30f else 0.15f),
+                            start = c,
+                            end = androidx.compose.ui.geometry.Offset(
+                                c.x + (kotlin.math.cos(a) * r).toFloat(),
+                                c.y + (kotlin.math.sin(a) * r).toFloat()
+                            ),
+                            strokeWidth = 1.5f
+                        )
+                    }
+                    // Outer-range boundary ring.
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.25f),
+                        radius = radiusPx,
+                        center = c,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+                    )
+                } else Modifier)
                 .pointerInput(control.id) {
                     detectDragGestures(
-                        onDragEnd = { knob = Offset.Zero; events.onStick(control, 0f, 0f) },
-                        onDragCancel = { knob = Offset.Zero; events.onStick(control, 0f, 0f) }
+                        onDragStart = {
+                            if (control.stickClickIndex >= 0) {
+                                clickSent = false
+                                clickJob?.cancel()
+                                clickJob = clickScope.launch {
+                                    kotlinx.coroutines.delay(350)
+                                    // Still near center after 350ms = click intent.
+                                    if (knob.getDistance() < radiusPx * 0.18f) {
+                                        clickSent = true
+                                        events.onStickClick(control, true)
+                                    }
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            clickJob?.cancel()
+                            if (clickSent) { events.onStickClick(control, false); clickSent = false }
+                            if (!control.stickSticky) {
+                                knob = Offset.Zero
+                                events.onStick(control, 0f, 0f)
+                            }
+                        },
+                        onDragCancel = {
+                            clickJob?.cancel()
+                            if (clickSent) { events.onStickClick(control, false); clickSent = false }
+                            if (!control.stickSticky) {
+                                knob = Offset.Zero
+                                events.onStick(control, 0f, 0f)
+                            }
+                        }
                     ) { change, drag ->
                         change.consume()
                         val next = knob + drag
-                        val dist = next.getDistance()
-                        val clamped = if (dist > radiusPx) next * (radiusPx / dist) else next
+                        // Gate clamp: square = per-axis, circle = radial.
+                        val clamped = if (squareGate) {
+                            Offset(
+                                next.x.coerceIn(-radiusPx, radiusPx),
+                                next.y.coerceIn(-radiusPx, radiusPx)
+                            )
+                        } else {
+                            val dist = next.getDistance()
+                            if (dist > radiusPx) next * (radiusPx / dist) else next
+                        }
                         knob = clamped
                         events.onStick(
                             control,

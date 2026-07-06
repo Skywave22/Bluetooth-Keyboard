@@ -7,13 +7,19 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,6 +40,7 @@ import com.bluepilot.remote.ui.screens.airmouse.AirMouseScreen
 import com.bluepilot.remote.ui.screens.pccombo.PcComboScreen
 import com.bluepilot.remote.ui.screens.preview3d.Preview3DScreen
 import com.bluepilot.remote.ui.screens.gamepadbuilder.GamepadBuilderScreen
+import com.bluepilot.remote.ui.screens.health.ConnectionHealthScreen
 import com.bluepilot.remote.ui.screens.help.HelpScreen
 import com.bluepilot.remote.ui.screens.keyboard.KeyboardScreen
 import com.bluepilot.remote.ui.screens.editor.LayoutEditorScreen
@@ -78,6 +85,7 @@ object Routes {
     const val PC_COMBO = "pc_combo"
     const val AIR_MOUSE = "air_mouse"
     const val PREVIEW_3D = "preview_3d"
+    const val CONNECTION_HEALTH = "connection_health"
 }
 
 @Composable
@@ -152,6 +160,9 @@ fun BluePilotApp() {
         composable(Routes.MULTIMEDIA) { MultimediaScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.PRESENTER) { PresenterScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.GAMEPAD) { GamepadScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.CONNECTION_HEALTH) {
+            ConnectionHealthScreen(onBack = { navController.popBackStack() })
+        }
         composable(Routes.HELP) { HelpScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.LAYOUTS) {
             LayoutsScreen(
@@ -190,10 +201,45 @@ fun BluePilotApp() {
         )
     }
 
+    // ADV S5 — persistent mini health indicator (real classification),
+    // top-right corner during active use; tap opens the dashboard.
+    if (currentRoute != Routes.CONNECTION_HEALTH) {
+        MiniHealthIndicator(
+            onOpen = { navController.navigate(Routes.CONNECTION_HEALTH) },
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
+    }
+
     // First-run tutorial overlay
     OnboardingOverlay(
         visible = !appSettings.onboardingDone,
         onFinish = { settingsViewModel.setOnboardingDone() }
     )
     } // Box
+}
+
+/**
+ * ADV S5 — tiny always-available health dot (only rendered when connected).
+ * Real classification from measured metrics; tap opens the dashboard.
+ */
+@Composable
+private fun MiniHealthIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val vm: com.bluepilot.remote.viewmodel.ConnectionHealthViewModel = hiltViewModel()
+    val connection by vm.connection.collectAsState()
+    if (!connection.isConnected) return
+    val snapshot by vm.snapshot.collectAsState()
+    val health = com.bluepilot.remote.domain.ConnectionHealthTracker.classify(snapshot)
+    val color = when (health) {
+        com.bluepilot.remote.domain.ConnectionHealthTracker.Health.GOOD -> androidx.compose.ui.graphics.Color(0xFF2ECC71)
+        com.bluepilot.remote.domain.ConnectionHealthTracker.Health.FAIR -> androidx.compose.ui.graphics.Color(0xFFF1C40F)
+        com.bluepilot.remote.domain.ConnectionHealthTracker.Health.POOR -> androidx.compose.ui.graphics.Color(0xFFE74C3C)
+    }
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .padding(top = 42.dp, end = 10.dp)
+            .size(12.dp)
+            .background(color, androidx.compose.foundation.shape.CircleShape)
+            .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f), androidx.compose.foundation.shape.CircleShape)
+            .clickable { onOpen() }
+    )
 }

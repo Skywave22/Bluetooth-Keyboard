@@ -22,9 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,8 +43,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.bluepilot.remote.ui.components.LocalReduceMotion
-import com.bluepilot.remote.ui.components.card3DTilt
 import com.bluepilot.remote.ui.components.carousel3D
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +79,14 @@ fun ThemeGalleryScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val app by viewModel.app.collectAsState()
+    // SECTION 1 — search/filter, favorites, recents.
+    var query by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val favorites = androidx.compose.runtime.remember(app.favoriteThemes) {
+        com.bluepilot.remote.ui.theme.ThemeListCodec.decode(app.favoriteThemes)
+    }
+    val recents = androidx.compose.runtime.remember(app.recentThemes) {
+        com.bluepilot.remote.ui.theme.ThemeListCodec.decode(app.recentThemes)
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -95,7 +103,7 @@ fun ThemeGalleryScreen(
         }
     ) { padding ->
         // Gallery grouped by design family (one section per mockup set).
-        val families: List<Pair<String, List<AppThemeSpec>>> = listOf(
+        val allFamilies: List<Pair<String, List<AppThemeSpec>>> = listOf(
             "Classic" to listOf(BuiltInThemes.PILOT_DARK, BuiltInThemes.PILOT_GLOW),
             "Liquid Glass" to listOf(BuiltInThemes.LIQUID_GLASS, BuiltInThemes.LIQUID_GLASS_LIGHT),
             "Glass × Material You" to listOf(BuiltInThemes.GLASS_YOU_DARK, BuiltInThemes.GLASS_YOU_LIGHT),
@@ -105,6 +113,15 @@ fun ThemeGalleryScreen(
             "Ambient" to listOf(BuiltInThemes.GALAXY, BuiltInThemes.PASTEL, BuiltInThemes.CHROME),
             "More" to listOf(BuiltInThemes.OLED_BLACK, BuiltInThemes.MINIMAL_LIGHT)
         )
+        // Search matches theme name, family name, or "dark"/"light".
+        val families = if (query.isBlank()) allFamilies else allFamilies.mapNotNull { (family, specs) ->
+            val q = query.trim()
+            val matched = specs.filter { s ->
+                s.name.contains(q, true) || family.contains(q, true) ||
+                    (if (s.isDark) "dark" else "light").contains(q, true)
+            }
+            if (matched.isEmpty()) null else family to matched
+        }
 
         val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
         LazyVerticalGrid(
@@ -117,6 +134,38 @@ fun ThemeGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // ---- Search field ----
+            item(key = "search", span = { GridItemSpan(2) }) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text("Search themes (name, family, dark/light)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // ---- Favorites quick row ----
+            if (query.isBlank() && favorites.isNotEmpty()) {
+                item(key = "favorites", span = { GridItemSpan(2) }) {
+                    QuickThemeRow(
+                        title = "★ Favorites",
+                        ids = favorites,
+                        activeId = app.themeId,
+                        onApply = { viewModel.setThemeId(it) }
+                    )
+                }
+            }
+            // ---- Recently used quick row ----
+            if (query.isBlank() && recents.isNotEmpty()) {
+                item(key = "recents", span = { GridItemSpan(2) }) {
+                    QuickThemeRow(
+                        title = "Recently used",
+                        ids = recents,
+                        activeId = app.themeId,
+                        onApply = { viewModel.setThemeId(it) }
+                    )
+                }
+            }
             families.forEach { (family, specs) ->
                 item(key = "header-" + family, span = { GridItemSpan(2) }) {
                     Text(
@@ -132,11 +181,12 @@ fun ThemeGalleryScreen(
                     ThemeCard(
                         spec = spec,
                         isActive = spec.id == app.themeId,
+                        isFavorite = spec.id in favorites,
+                        onToggleFavorite = { viewModel.toggleFavoriteTheme(spec.id) },
                         onApply = { viewModel.setThemeId(spec.id) },
                         carouselModifier = androidx.compose.ui.Modifier.carousel3D(
                             itemIndex = idx,
-                            firstVisible = gridState.firstVisibleItemIndex,
-                            firstVisibleOffsetPx = gridState.firstVisibleItemScrollOffset,
+                            gridState = gridState,
                             itemHeightPx = 700f,
                             enabled = !LocalReduceMotion.current
                         )
@@ -147,11 +197,52 @@ fun ThemeGalleryScreen(
     }
 }
 
+/** SECTION 1 — horizontal quick-access chips (favorites / recents). */
+@Composable
+private fun QuickThemeRow(
+    title: String,
+    ids: List<String>,
+    activeId: String,
+    onApply: (String) -> Unit
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(6.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(ids.size, key = { ids[it] }) { i ->
+                val spec = BuiltInThemes.byId(ids[i])
+                val active = spec.id == activeId
+                androidx.compose.material3.FilterChip(
+                    selected = active,
+                    onClick = { if (!active) onApply(spec.id) },
+                    label = { Text(spec.name) },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(spec.primary, CircleShape)
+                                .border(1.dp, spec.outline, CircleShape)
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ThemeCard(
     spec: AppThemeSpec,
     isActive: Boolean,
     onApply: () -> Unit,
+    isFavorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
     carouselModifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
 ) {
     val localTheme = LocalAppTheme.current
@@ -167,7 +258,7 @@ private fun ThemeCard(
     } else Modifier
 
     GlassCard(
-        modifier = Modifier
+        modifier = carouselModifier      // AUDIT FIX: coverflow tilt was computed but never applied
             .fillMaxWidth()
             .then(borderModifier),
         shape = RoundedCornerShape(18.dp)
@@ -193,6 +284,17 @@ private fun ThemeCard(
                         text = if (localTheme.monoFont) (if (spec.isDark) "DARK" else "LIGHT") else (if (spec.isDark) "Dark" else "Light"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // SECTION 1 — favorite/pin toggle.
+                // SECTION 4: full 48dp touch target (icon stays 22dp).
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        if (isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        contentDescription = if (isFavorite) "Unpin theme" else "Pin theme",
+                        tint = if (isFavorite) borderGlowColor
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 if (isActive) {

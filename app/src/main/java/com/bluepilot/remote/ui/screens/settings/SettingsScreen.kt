@@ -1,6 +1,7 @@
 package com.bluepilot.remote.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +30,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -180,6 +186,9 @@ fun SettingsScreen(
                         )
                     }
                 }
+                // AUDIT FIX: the 3D showcase screen existed but was
+                // unreachable — this button was never rendered.
+                TextButton(onClick = onOpen3DPreview) { Text("Open 3D effects preview") }
                 Text("Icon pack", style = MaterialTheme.typography.bodyMedium)
                 Row(modifier = Modifier.padding(vertical = 4.dp)) {
                     listOf("FILLED", "OUTLINED", "ROUNDED", "SHARP").forEach { pack ->
@@ -203,6 +212,38 @@ fun SettingsScreen(
                     viewModel::setSecureScreen,
                     subtitle = "Blocks screenshots and app-switcher preview"
                 )
+            }
+
+            // ---------- SECTION 1: Auto theme scheduling ----------
+            if (matches("theme", "auto", "schedule", "night", "day")) SettingsGroup("Auto theme schedule") {
+                ToggleRow(
+                    "Switch theme by time of day",
+                    app.autoThemeEnabled,
+                    viewModel::setAutoTheme,
+                    subtitle = "Day theme by day, night theme at night (checked every minute)"
+                )
+                if (app.autoThemeEnabled) {
+                    Text("Day theme", style = MaterialTheme.typography.bodyMedium)
+                    ThemePickerRow(
+                        selectedId = app.autoDayTheme,
+                        dark = false,
+                        onPick = viewModel::setAutoDayTheme
+                    )
+                    Text("Night theme", style = MaterialTheme.typography.bodyMedium)
+                    ThemePickerRow(
+                        selectedId = app.autoNightTheme,
+                        dark = true,
+                        onPick = viewModel::setAutoNightTheme
+                    )
+                    SliderRow(
+                        "Night starts (hour)", app.autoNightStart,
+                        viewModel::setAutoNightStart, max = 23
+                    )
+                    SliderRow(
+                        "Night ends (hour)", app.autoNightEnd,
+                        viewModel::setAutoNightEnd, max = 23
+                    )
+                }
             }
 
             // ---------- Mouse ----------
@@ -360,5 +401,34 @@ private fun SliderRow(
                 inactiveTrackColor = spec.outline.copy(alpha = 0.3f)
             )
         )
+    }
+}
+
+/** SECTION 1 — compact theme chips for the auto-schedule pickers. */
+@Composable
+private fun ThemePickerRow(
+    selectedId: String,
+    dark: Boolean,
+    onPick: (String) -> Unit
+) {
+    val options = com.bluepilot.remote.ui.theme.BuiltInThemes.ALL.filter { it.isDark == dark }
+    LazyRow(
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        items(options, key = { it.id }) { theme ->
+            FilterChip(
+                selected = theme.id == selectedId,
+                onClick = { onPick(theme.id) },
+                label = { Text(theme.name) },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(theme.primary, CircleShape)
+                    )
+                }
+            )
+        }
     }
 }

@@ -40,6 +40,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.MouseButton
 import com.bluepilot.remote.ui.components.GlassCard
 import com.bluepilot.remote.ui.components.KeyCard
+import com.bluepilot.remote.ui.components.HintBar
 import com.bluepilot.remote.ui.components.NotConnectedBanner
 import com.bluepilot.remote.ui.components.rememberHaptic
 import com.bluepilot.remote.ui.theme.LocalAppTheme
@@ -82,6 +83,7 @@ fun MouseScreen(
                 .padding(horizontal = 16.dp)
         ) {
             NotConnectedBanner(!isConnected)
+            HintBar("Long-press the trackpad for right-click • two-finger drag scrolls")
 
             Row(modifier = Modifier.weight(1f)) {
                 // ---------- Trackpad ----------

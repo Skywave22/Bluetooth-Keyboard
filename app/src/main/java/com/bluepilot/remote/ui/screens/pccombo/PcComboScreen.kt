@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -34,7 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,7 +74,13 @@ fun PcComboScreen(
         message?.let { snackbar.showSnackbar(it); viewModel.consumeMessage() }
     }
 
+    var showVoiceSheet by remember { mutableStateOf(false) }   // ADV S4
     Scaffold(
+        floatingActionButton = {
+            androidx.compose.material3.SmallFloatingActionButton(onClick = { showVoiceSheet = true }) {
+                Icon(Icons.Rounded.Mic, contentDescription = "Voice input")
+            }
+        },
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -203,6 +212,11 @@ fun PcComboScreen(
                 }
             }
         }
+    }
+
+    // ADV S4 — voice input quick-action sheet.
+    if (showVoiceSheet) {
+        com.bluepilot.remote.ui.components.VoiceInputSheet(onDismiss = { showVoiceSheet = false })
     }
 }
 

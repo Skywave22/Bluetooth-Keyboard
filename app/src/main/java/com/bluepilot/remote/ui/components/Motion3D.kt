@@ -61,18 +61,6 @@ fun Modifier.pressDepth3D(
     }
 }
 
-/**
- * Idle 3D tilt for cards (theme gallery): gentle continuous Y-rotation
- * sweep driven by [phase] (0..1). Used with rememberInfiniteTransition.
- */
-fun Modifier.card3DTilt(phase: Float, maxDegrees: Float = 7f, enabled: Boolean = true): Modifier =
-    if (!enabled) this else this.graphicsLayer {
-        cameraDistance = CAMERA_DISTANCE * density
-        // Smooth -max..+max sweep from the 0..1 phase.
-        val angle = kotlin.math.sin(phase * 2f * Math.PI).toFloat() * maxDegrees
-        rotationY = angle
-    }
-
 /** Simple elevation helper: pressed elements drop their shadow. */
 @Composable
 fun pressedElevation(interactionSource: InteractionSource, idle: Float, pressed: Float): Float {

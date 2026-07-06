@@ -39,6 +39,8 @@ import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -117,7 +119,12 @@ fun GamepadBuilderScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileList(onBack: () -> Unit, viewModel: GamepadBuilderViewModel) {
-    val profiles by viewModel.profiles.collectAsState()
+    val profiles by viewModel.filteredProfiles.collectAsState()
+    val recents by viewModel.recentProfiles.collectAsState()
+    val query by viewModel.profileQuery.collectAsState()
+    val tagFilter by viewModel.tagFilter.collectAsState()
+    val suggested by viewModel.suggestedTags.collectAsState()
+    val appSettings by viewModel.appSettings.collectAsState()
     val message by viewModel.message.collectAsState()
     val exportPayload by viewModel.exportPayload.collectAsState()
     val context = LocalContext.current
@@ -184,6 +191,68 @@ private fun ProfileList(onBack: () -> Unit, viewModel: GamepadBuilderViewModel) 
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
+            // ADV S3 — search + tag filter.
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { viewModel.setProfileQuery(it) },
+                    singleLine = true,
+                    placeholder = { Text("Search gamepads (name or tag)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(
+                        selected = tagFilter == null,
+                        onClick = { viewModel.setTagFilter(null) },
+                        label = { Text("All") }
+                    )
+                    com.bluepilot.remote.domain.ProfileSuggester.ALL_TAGS.forEach { tag ->
+                        FilterChip(
+                            selected = tagFilter == tag,
+                            onClick = { viewModel.setTagFilter(if (tagFilter == tag) null else tag) },
+                            label = { Text(tag) }
+                        )
+                    }
+                }
+            }
+            // ADV S3 — contextual suggestion from the real connected host.
+            if (suggested.isNotEmpty()) {
+                item {
+                    Text(
+                        "Connected host suggests: ${suggested.joinToString(" • ")} layouts",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            // ADV S3 — recently played quick-access row.
+            if (recents.isNotEmpty() && query.isBlank() && tagFilter == null) {
+                item {
+                    Column {
+                        Text(
+                            "Recently played",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            recents.forEach { rp ->
+                                AssistChip(
+                                    onClick = { viewModel.play(rp.id) },
+                                    label = { Text("▶ " + rp.spec.name) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             items(profiles, key = { it.id }) { profile ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -198,9 +267,22 @@ private fun ProfileList(onBack: () -> Unit, viewModel: GamepadBuilderViewModel) 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(profile.spec.name, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "${profile.spec.controls.size} controls" + if (profile.isBuiltIn) "  •  template" else "",
+                                "${profile.spec.controls.size} controls" +
+                                    (if (profile.spec.tags.isNotEmpty()) "  •  " + profile.spec.tags.joinToString(", ") else "") +
+                                    (if (profile.isBuiltIn) "  •  template" else ""),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        // ADV S3 — favorite pin (favorites sort to top).
+                        val fav = com.bluepilot.remote.ui.theme.ThemeListCodec.contains(
+                            appSettings.favoriteGamepads, profile.id.toString())
+                        IconButton(onClick = { viewModel.toggleFavorite(profile.id) }) {
+                            Icon(
+                                if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                contentDescription = if (fav) "Unfavorite" else "Favorite",
+                                tint = if (fav) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = { viewModel.play(profile.id) }) {
@@ -259,6 +341,18 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
                 viewModel.onDpadTouch(control, dx, dy)
             override fun onDpadRelease(control: GamepadControlSpec) =
                 viewModel.onDpadRelease(control)
+            override fun onToggle(control: GamepadControlSpec) =
+                viewModel.onToggleButton(control)
+            override fun onMultiTap(control: GamepadControlSpec) =
+                viewModel.onMultiTap(control)
+            override fun onRadialPick(control: GamepadControlSpec, index: Int) =
+                viewModel.onRadialPick(control, index)
+            override fun onArrow(control: GamepadControlSpec, pressed: Boolean) =
+                viewModel.onArrow(control, pressed)
+            override fun onComboZone(control: GamepadControlSpec, zone: Int, pressed: Boolean) =
+                viewModel.onComboZone(control, zone, pressed)
+            override fun onStickClick(control: GamepadControlSpec, pressed: Boolean) =
+                viewModel.onStickClick(control, pressed)
         }
     }
 
@@ -327,10 +421,25 @@ private fun GamepadPlayer(viewModel: GamepadBuilderViewModel) {
                     )
                 }
             }
+            // ADV S2 — shift-layer aware canvas. If the layout defines a
+            // shift control, its presses toggle the visible layer instead
+            // of ALSO sending shifted-layer controls' HID (base action
+            // still fires — a shift key can double as a real button).
+            val activeLayer by viewModel.activeLayer.collectAsState()
+            val shiftId = profile.spec.shiftControlId
+            val layerEvents = remember(shiftId) {
+                if (shiftId.isBlank()) events else object : GamepadEvents by events {
+                    override fun onButton(control: GamepadControlSpec, pressed: Boolean) {
+                        if (control.id == shiftId) viewModel.onShift(pressed)
+                        events.onButton(control, pressed)
+                    }
+                }
+            }
             GamepadCanvas(
                 layout = profile.spec,
-                events = events,
-                modifier = Modifier.fillMaxSize()
+                events = layerEvents,
+                modifier = Modifier.fillMaxSize(),
+                activeLayer = activeLayer
             )
         }
     }
@@ -349,6 +458,7 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
     val canUndo by viewModel.canUndo.collectAsState()
     val (_, spec) = draft ?: return
     var showProperties by remember { mutableStateOf(false) }
+    var showVersions by remember { mutableStateOf(false) }   // ADV S3
 
     val playEvents = remember {
         object : GamepadEvents {
@@ -360,6 +470,18 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
                 viewModel.onDpadTouch(control, dx, dy)
             override fun onDpadRelease(control: GamepadControlSpec) =
                 viewModel.onDpadRelease(control)
+            override fun onToggle(control: GamepadControlSpec) =
+                viewModel.onToggleButton(control)
+            override fun onMultiTap(control: GamepadControlSpec) =
+                viewModel.onMultiTap(control)
+            override fun onRadialPick(control: GamepadControlSpec, index: Int) =
+                viewModel.onRadialPick(control, index)
+            override fun onArrow(control: GamepadControlSpec, pressed: Boolean) =
+                viewModel.onArrow(control, pressed)
+            override fun onComboZone(control: GamepadControlSpec, zone: Int, pressed: Boolean) =
+                viewModel.onComboZone(control, zone, pressed)
+            override fun onStickClick(control: GamepadControlSpec, pressed: Boolean) =
+                viewModel.onStickClick(control, pressed)
         }
     }
 
@@ -418,10 +540,128 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
                             AssistChip(onClick = { viewModel.addControl(GamepadControlType.TRIGGER) }, label = { Text(if (themeSpec.monoFont) "TRIGGER" else "Trigger") })
                             AssistChip(onClick = { viewModel.addControl(GamepadControlType.STICK) }, label = { Text(if (themeSpec.monoFont) "STICK" else "Stick") })
                             AssistChip(onClick = { viewModel.addControl(GamepadControlType.DPAD) }, label = { Text(if (themeSpec.monoFont) "D-PAD" else "D-pad") })
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.ARROW) }, label = { Text(if (themeSpec.monoFont) "ARROW" else "Arrow") })
+                            AssistChip(onClick = { viewModel.addControl(GamepadControlType.COMBO) }, label = { Text(if (themeSpec.monoFont) "L1+L2" else "L1+L2") })
+                            // ADV S2 — layout intelligence tools.
+                            AssistChip(onClick = { viewModel.mirrorWholeLayout() }, label = { Text("⇄ Flip hand") })
+                            val gridOn = (viewModel.draft.collectAsState().value?.second?.gridSize ?: 0f) > 0f
+                            AssistChip(
+                                onClick = { viewModel.setGridSize(if (gridOn) 0f else 0.025f) },
+                                label = { Text(if (gridOn) "Grid ✓" else "Grid") }
+                            )
+                            val grip = viewModel.heatmapGrip.collectAsState().value
+                            AssistChip(
+                                onClick = {
+                                    val next = when (grip) {
+                                        null -> com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.TWO_THUMB
+                                        com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.TWO_THUMB ->
+                                            com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.CLAW
+                                        com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.CLAW ->
+                                            com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.PALM
+                                        com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.PALM -> null
+                                    }
+                                    viewModel.setHeatmapGrip(next)
+                                },
+                                label = { Text(when (grip) {
+                                    null -> "Reach map"
+                                    com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.TWO_THUMB -> "Reach: thumbs"
+                                    com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.CLAW -> "Reach: claw"
+                                    com.bluepilot.remote.domain.LayoutIntelligence.GripStyle.PALM -> "Reach: palm"
+                                }) }
+                            )
+                            val testOn = viewModel.testMode.collectAsState().value
+                            AssistChip(
+                                onClick = { viewModel.setTestMode(!testOn) },
+                                label = { Text(if (testOn) "Test ✓" else "Test mode") }
+                            )
+                            // ADV S3 — versioning + A/B compare.
+                            AssistChip(
+                                onClick = { viewModel.loadVersions(); showVersions = true },
+                                label = { Text("Versions") }
+                            )
+                            val hasB = viewModel.hasAbSlot.collectAsState().value
+                            AssistChip(
+                                onClick = { viewModel.setAbSlot() },
+                                label = { Text(if (hasB) "Set B ✓" else "Set as B") }
+                            )
+                            if (hasB) {
+                                AssistChip(
+                                    onClick = { viewModel.toggleAb() },
+                                    label = { Text("⇆ A/B") }
+                                )
+                            }
+                            // ADV S3 — profile tags.
+                            com.bluepilot.remote.domain.ProfileSuggester.ALL_TAGS.forEach { tag ->
+                                FilterChip(
+                                    selected = tag in spec.tags,
+                                    onClick = { viewModel.toggleTag(tag) },
+                                    label = { Text(tag) }
+                                )
+                            }
                         } else {
                             AssistChip(onClick = { showProperties = true }, label = { Text(if (themeSpec.monoFont) "PROPERTIES" else "Properties") })
+                            AssistChip(onClick = { viewModel.mirrorSelected() }, label = { Text("Mirror →") })
+                            val selLayer = viewModel.selectedControl()?.layer ?: 0
+                            AssistChip(
+                                onClick = { viewModel.setSelectedLayer(if (selLayer == 0) 1 else 0) },
+                                label = { Text(if (selLayer == 0) "→ Shift layer" else "→ Base layer") }
+                            )
+                            val isShift = viewModel.draft.collectAsState().value?.second?.shiftControlId == selectedId
+                            AssistChip(
+                                onClick = { viewModel.setSelectedAsShift() },
+                                label = { Text(if (isShift) "Shift key ✓" else "Make shift key") }
+                            )
                             AssistChip(onClick = { viewModel.removeSelected() }, label = { Text(if (themeSpec.monoFont) "DELETE" else "Delete") })
                             AssistChip(onClick = { viewModel.select(null) }, label = { Text(if (themeSpec.monoFont) "DESELECT" else "Deselect") })
+                        }
+                    }
+                }
+            }
+
+            // ADV S2 — smart spacing warnings (mis-tap risk).
+            if (!previewMode) {
+                val warns = viewModel.spacingWarnings()
+                if (warns.isNotEmpty()) {
+                    Text(
+                        text = "⚠ ${warns.size} control pair${if (warns.size > 1) "s" else ""} closer than 2% — mis-tap risk. Spread them out.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            // ADV S2 — Test Mode: real wire bytes + measured dispatch time.
+            val testModeOn by viewModel.testMode.collectAsState()
+            if (!previewMode && testModeOn) {
+                val testEvents by viewModel.testEvents.collectAsState()
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            "TEST MODE — tap controls below. Shows real HID report bytes + measured dispatch µs.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        testEvents.take(5).forEach { e ->
+                            Text(
+                                text = "${e.label}: ${e.wire} — ${e.latencyUs}µs",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * 0.85f
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (testEvents.isEmpty()) {
+                            Text(
+                                "No events yet — tap any button control on the canvas.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -440,6 +680,76 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
                 val h = maxHeight
                 val wPx = constraints.maxWidth.toFloat()
                 val hPx = constraints.maxHeight.toFloat()
+
+                // ADV S2 — magnetic grid dots + thumb-reach heatmap +
+                // alignment guides, all one lightweight Canvas draw.
+                val grip by viewModel.heatmapGrip.collectAsState()
+                val gridSize = spec.gridSize
+                val dragGuides = if (selectedId != null && !previewMode)
+                    viewModel.alignmentGuides(selectedId!!) else null
+                val guideColor = MaterialTheme.colorScheme.primary
+                val warnColor = MaterialTheme.colorScheme.error
+                if (!previewMode && (gridSize > 0f || grip != null || dragGuides != null)) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                        // Grid dots.
+                        if (gridSize > 0f) {
+                            var gx = gridSize
+                            while (gx < 1f) {
+                                var gy = gridSize
+                                while (gy < 1f) {
+                                    drawCircle(
+                                        color = guideColor.copy(alpha = 0.20f),
+                                        radius = 1.6f,
+                                        center = androidx.compose.ui.geometry.Offset(gx * size.width, gy * size.height)
+                                    )
+                                    gy += gridSize
+                                }
+                                gx += gridSize
+                            }
+                        }
+                        // Thumb-reach heatmap: comfortable (green) + stretch (amber) arcs.
+                        grip?.let { g ->
+                            com.bluepilot.remote.domain.LayoutIntelligence.reachZones(g).forEach { z ->
+                                val c = androidx.compose.ui.geometry.Offset(z.cx * size.width, z.cy * size.height)
+                                drawCircle(
+                                    color = androidx.compose.ui.graphics.Color(0xFFFFB300).copy(alpha = 0.14f),
+                                    radius = z.stretch * size.width, center = c
+                                )
+                                drawCircle(
+                                    color = androidx.compose.ui.graphics.Color(0xFF2ECC71).copy(alpha = 0.18f),
+                                    radius = z.comfortable * size.width, center = c
+                                )
+                            }
+                        }
+                        // Live alignment guides while a control is selected.
+                        dragGuides?.let { gsn ->
+                            if (gsn.verticalCenter) drawLine(
+                                guideColor.copy(alpha = 0.8f),
+                                androidx.compose.ui.geometry.Offset(size.width / 2f, 0f),
+                                androidx.compose.ui.geometry.Offset(size.width / 2f, size.height), 2f
+                            )
+                            if (gsn.horizontalCenter) drawLine(
+                                guideColor.copy(alpha = 0.8f),
+                                androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
+                                androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), 2f
+                            )
+                            gsn.matchX.forEach { mx ->
+                                drawLine(
+                                    guideColor.copy(alpha = 0.55f),
+                                    androidx.compose.ui.geometry.Offset(mx * size.width, 0f),
+                                    androidx.compose.ui.geometry.Offset(mx * size.width, size.height), 1.5f
+                                )
+                            }
+                            gsn.matchY.forEach { my ->
+                                drawLine(
+                                    guideColor.copy(alpha = 0.55f),
+                                    androidx.compose.ui.geometry.Offset(0f, my * size.height),
+                                    androidx.compose.ui.geometry.Offset(size.width, my * size.height), 1.5f
+                                )
+                            }
+                        }
+                    }
+                }
 
                 spec.controls.forEach { control ->
                     val frame = control.frame.sanitized()
@@ -465,12 +775,28 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
                                 }
                             } else Modifier
 
+                            if (control.layer == 1) {
+                                Text(
+                                    "⇧",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)
+                                )
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .then(borderGlowModifier)
-                                    .pointerInput(control.id + "-tap") {
-                                        detectTapGestures(onTap = { viewModel.select(control.id) })
+                                    .pointerInput(control.id + "-tap", testModeOn) {
+                                        detectTapGestures(onTap = {
+                                            if (testModeOn &&
+                                                (control.type == GamepadControlType.BUTTON ||
+                                                 control.type == GamepadControlType.TRIGGER ||
+                                                 control.type == GamepadControlType.COMBO)) {
+                                                // ADV S2 test mode: real press+release through the HID path.
+                                                viewModel.testPress(control, true)
+                                                viewModel.testPress(control, false)
+                                            } else viewModel.select(control.id)
+                                        })
                                     }
                                     .pointerInput(control.id + "-drag") {
                                         detectDragGestures(
@@ -519,6 +845,48 @@ private fun GamepadEditor(viewModel: GamepadBuilderViewModel) {
     if (showProperties && selectedId != null) {
         ModalBottomSheet(onDismissRequest = { showProperties = false }) {
             ControlPropertiesPanel(viewModel)
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    // ADV S3 — version history sheet: revert to any archived iteration.
+    if (showVersions) {
+        val versions by viewModel.versions.collectAsState()
+        ModalBottomSheet(onDismissRequest = { showVersions = false }) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                Text(
+                    "Version history",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                if (versions.isEmpty()) {
+                    Text(
+                        "No archived versions yet — each Save of this profile archives the previous layout here (last ${com.bluepilot.remote.data.gamepad.VersionCodec.MAX_VERSIONS}).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                versions.forEachIndexed { i, v ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("v-${versions.size - i}  •  ${v.controls.size} controls", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                v.name + if (v.tags.isNotEmpty()) "  •  " + v.tags.joinToString(", ") else "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        AssistChip(
+                            onClick = { viewModel.revertTo(v); showVersions = false },
+                            label = { Text("Revert") }
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -625,6 +993,66 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                     valueRange = 2f..20f
                 )
             }
+            // ADV S1 — button press semantics.
+            Spacer(Modifier.height(8.dp))
+            Text("Press mode", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                com.bluepilot.remote.model.gamepad.ButtonMode.entries.forEach { m ->
+                    FilterChip(
+                        selected = control.buttonMode == m,
+                        onClick = { viewModel.updateSelected { it.copy(buttonMode = m) } },
+                        label = { Text(m.name.lowercase().replace("_", " ")) }
+                    )
+                }
+            }
+            if (control.buttonMode == com.bluepilot.remote.model.gamepad.ButtonMode.MULTI_TAP) {
+                Text("Double-tap sends", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    (0..15).forEach { index ->
+                        FilterChip(
+                            selected = control.secondaryButtonIndex == index,
+                            onClick = { viewModel.updateSelected { it.copy(secondaryButtonIndex = index) } },
+                            label = { Text(GamepadButtonNames.label(index, draft?.second?.naming ?: ButtonNaming.XBOX)) }
+                        )
+                    }
+                }
+            }
+            if (control.buttonMode == com.bluepilot.remote.model.gamepad.ButtonMode.RADIAL) {
+                Text("Radial wheel options (tap to add/remove)", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    (0..15).forEach { index ->
+                        val selectedOpt = index in control.radialOptions
+                        FilterChip(
+                            selected = selectedOpt,
+                            onClick = {
+                                viewModel.updateSelected {
+                                    it.copy(radialOptions =
+                                        if (selectedOpt) it.radialOptions - index
+                                        else (it.radialOptions + index).take(com.bluepilot.remote.model.gamepad.GamepadControlSpec.RADIAL_MAX))
+                                }
+                            },
+                            label = { Text(GamepadButtonNames.label(index, draft?.second?.naming ?: ButtonNaming.XBOX)) }
+                        )
+                    }
+                }
+            }
+            // ADV S1 — press-confirmation glow.
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Press glow confirmation", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.pressGlow,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(pressGlow = v) } }
+                )
+            }
             // SECTION 8 — per-control haptic pattern
             Text("Icon", style = MaterialTheme.typography.bodyMedium)
             Row(
@@ -717,6 +1145,86 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                     valueRange = 0f..50f
                 )
             }
+            // ADV S1 — advanced stick options.
+            Text("Gate shape", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.bluepilot.remote.model.gamepad.StickGate.entries.forEach { g ->
+                    FilterChip(
+                        selected = control.stickGate == g,
+                        onClick = { viewModel.updateSelected { it.copy(stickGate = g) } },
+                        label = { Text(if (g == com.bluepilot.remote.model.gamepad.StickGate.CIRCLE) "Circle" else "Square") }
+                    )
+                }
+            }
+            Text("Size preset", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = control.frame.w <= 0.17f,
+                    onClick = { viewModel.updateSelected { it.copy(frame = it.frame.copy(w = 0.15f, h = 0.27f)) } },
+                    label = { Text("Mini") }
+                )
+                FilterChip(
+                    selected = control.frame.w > 0.17f,
+                    onClick = { viewModel.updateSelected { it.copy(frame = it.frame.copy(w = 0.22f, h = 0.40f)) } },
+                    label = { Text("Full-size") }
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("8-direction guide lines", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.stickGuides,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(stickGuides = v) } }
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Sticky position (no auto-center)", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.stickSticky,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(stickSticky = v) } }
+                )
+            }
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Outer range", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("${(control.outerRange * 100).toInt()}%", color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                Slider(
+                    value = control.outerRange,
+                    onValueChange = { v -> viewModel.updateSelected(withUndo = false) { it.copy(outerRange = v) } },
+                    valueRange = 0.5f..1f
+                )
+            }
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Anti-deadzone", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("${control.antiDeadZone}%", color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                Slider(
+                    value = control.antiDeadZone.toFloat(),
+                    onValueChange = { v -> viewModel.updateSelected(withUndo = false) { it.copy(antiDeadZone = v.toInt()) } },
+                    valueRange = 0f..40f
+                )
+            }
+            Text("Stick click (press-down = L3/R3)", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(
+                    selected = control.stickClickIndex < 0,
+                    onClick = { viewModel.updateSelected { it.copy(stickClickIndex = -1) } },
+                    label = { Text("Off") }
+                )
+                listOf(10 to "L3", 11 to "R3").forEach { (idx, name) ->
+                    FilterChip(
+                        selected = control.stickClickIndex == idx,
+                        onClick = { viewModel.updateSelected { it.copy(stickClickIndex = idx) } },
+                        label = { Text(name) }
+                    )
+                }
+            }
         }
 
         // D-pad options
@@ -731,6 +1239,114 @@ private fun ControlPropertiesPanel(viewModel: GamepadBuilderViewModel) {
                     onCheckedChange = { v -> viewModel.updateSelected { it.copy(eightWay = v) } }
                 )
             }
+            // ADV S1 — D-pad style + diagonal-only.
+            Text("D-pad style", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.bluepilot.remote.model.gamepad.DpadStyle.entries.forEach { s ->
+                    FilterChip(
+                        selected = control.dpadStyle == s,
+                        onClick = { viewModel.updateSelected { it.copy(dpadStyle = s) } },
+                        label = { Text(if (s == com.bluepilot.remote.model.gamepad.DpadStyle.CROSS) "Cross" else "Circular") }
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Diagonals only", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.diagonalOnly,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(diagonalOnly = v) } }
+                )
+            }
+        }
+
+        // ADV S1 — ARROW options.
+        if (control.type == GamepadControlType.ARROW) {
+            Text("Direction", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                com.bluepilot.remote.model.gamepad.ArrowDirection.entries.forEach { d ->
+                    FilterChip(
+                        selected = control.arrowDirection == d,
+                        onClick = { viewModel.updateSelected { it.copy(arrowDirection = d) } },
+                        label = { Text(d.name.lowercase().replace("_", "-")) }
+                    )
+                }
+            }
+            Text("Style", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.bluepilot.remote.model.gamepad.ArrowStyle.entries.forEach { s ->
+                    FilterChip(
+                        selected = control.arrowStyle == s,
+                        onClick = { viewModel.updateSelected { it.copy(arrowStyle = s) } },
+                        label = { Text(s.name.lowercase().replaceFirstChar { c -> c.uppercase() }) }
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Hold-to-repeat", modifier = Modifier.weight(1f))
+                Switch(
+                    checked = control.arrowRepeat,
+                    onCheckedChange = { v -> viewModel.updateSelected { it.copy(arrowRepeat = v) } }
+                )
+            }
+            if (control.arrowRepeat) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Repeat rate", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("${control.arrowRepeatRate}/s", color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                Slider(
+                    value = control.arrowRepeatRate.toFloat(),
+                    onValueChange = { v -> viewModel.updateSelected(withUndo = false) { it.copy(arrowRepeatRate = v.toInt()) } },
+                    valueRange = 2f..30f
+                )
+            }
+        }
+
+        // ADV S1 — COMBO (bumper+trigger) options.
+        if (control.type == GamepadControlType.COMBO) {
+            val comboNaming = draft?.second?.naming ?: ButtonNaming.XBOX
+            Text("Top zone sends", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                (0..15).forEach { index ->
+                    FilterChip(
+                        selected = control.buttonIndex == index,
+                        onClick = { viewModel.updateSelected { it.copy(buttonIndex = index) } },
+                        label = { Text(GamepadButtonNames.label(index, comboNaming)) }
+                    )
+                }
+            }
+            Text("Bottom zone sends", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                (0..15).forEach { index ->
+                    FilterChip(
+                        selected = control.comboSecondIndex == index,
+                        onClick = { viewModel.updateSelected { it.copy(comboSecondIndex = index) } },
+                        label = { Text(GamepadButtonNames.label(index, comboNaming)) }
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = control.label,
+                onValueChange = { new -> viewModel.updateSelected { it.copy(label = new) } },
+                label = { Text("Label prefix (L or R)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         Spacer(Modifier.height(10.dp))

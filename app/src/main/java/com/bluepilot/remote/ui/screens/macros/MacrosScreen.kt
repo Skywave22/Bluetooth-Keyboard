@@ -117,7 +117,7 @@ fun MacrosScreen(
                 onClick = { viewModel.newMacro() },
                 containerColor = spec.primary
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "New macro", tint = Color.White)
+                Icon(Icons.Rounded.Add, contentDescription = "New macro", tint = spec.onPrimary)
             }
         },
         bottomBar = {

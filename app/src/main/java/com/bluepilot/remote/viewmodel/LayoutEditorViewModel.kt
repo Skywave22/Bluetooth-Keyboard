@@ -79,6 +79,26 @@ class LayoutEditorViewModel @Inject constructor(
     val canUndo: StateFlow<Boolean> get() = _canUndo
     private val _canUndo = MutableStateFlow(false)
 
+    // SECTION 2 — redo stack (cleared on any new mutation).
+    private val redoStack = ArrayDeque<LayoutSpec>()
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
+    // SECTION 2 — element clipboard (copy/paste inside the editor).
+    private val _clipboard = MutableStateFlow<WidgetSpec?>(null)
+    val hasClipboard: StateFlow<Boolean> get() = _hasClipboard
+    private val _hasClipboard = MutableStateFlow(false)
+
+    // SECTION 2 — multi-select set (long-press to add/remove).
+    private val _multiSelection = MutableStateFlow<Set<String>>(emptySet())
+    val multiSelection: StateFlow<Set<String>> = _multiSelection.asStateFlow()
+
+    // SECTION 2 — grid overlay + canvas zoom.
+    private val _showGrid = MutableStateFlow(false)
+    val showGrid: StateFlow<Boolean> = _showGrid.asStateFlow()
+    private val _zoom = MutableStateFlow(1f)
+    val zoom: StateFlow<Float> = _zoom.asStateFlow()
+
     private var loadedBuiltIn = false
 
     init {
@@ -120,10 +140,20 @@ class LayoutEditorViewModel @Inject constructor(
         _saved.value = false
     }
 
-    /** Continuous drag: no undo per pixel — call [beginGesture] first. */
+    /** Continuous drag: no undo per pixel — call [beginGesture] first.
+     *  SECTION 2: if the widget belongs to a group, the whole group moves
+     *  together (delta applied to every member). */
     fun moveSelected(x: Float, y: Float) {
         val id = _selectedId.value ?: return
-        _layout.value = LayoutEditorOps.place(_layout.value, id, x, y)
+        val current = _layout.value.widgets.firstOrNull { it.id == id } ?: return
+        val members = com.bluepilot.remote.domain.EditorProOps.groupMembers(_layout.value, id)
+        _layout.value = if (members.size > 1) {
+            val dx = x - current.frame.x
+            val dy = y - current.frame.y
+            com.bluepilot.remote.domain.EditorProOps.moveMany(_layout.value, members, dx, dy)
+        } else {
+            LayoutEditorOps.place(_layout.value, id, x, y)
+        }
         _dirty.value = true
         _saved.value = false
     }
@@ -216,15 +246,132 @@ class LayoutEditorViewModel @Inject constructor(
         undoStack.addLast(_layout.value)
         while (undoStack.size > UNDO_LIMIT) undoStack.removeFirst()
         _canUndo.value = undoStack.isNotEmpty()
+        // New mutation invalidates the redo branch.
+        redoStack.clear()
+        _canRedo.value = false
     }
 
     fun undo() {
         val previous = undoStack.removeLastOrNull() ?: return
+        redoStack.addLast(_layout.value)
+        while (redoStack.size > UNDO_LIMIT) redoStack.removeFirst()
+        _canRedo.value = true
         _layout.value = previous
         _canUndo.value = undoStack.isNotEmpty()
         _dirty.value = true
         _saved.value = false
     }
+
+    /** SECTION 2 — redo (inverse of undo). */
+    fun redo() {
+        val next = redoStack.removeLastOrNull() ?: return
+        undoStack.addLast(_layout.value)
+        _canUndo.value = true
+        _layout.value = next
+        _canRedo.value = redoStack.isNotEmpty()
+        _dirty.value = true
+        _saved.value = false
+    }
+
+    // ------------------------------------------------------------------
+    // SECTION 2 — clipboard, layering, alignment, multi-select, grouping
+    // ------------------------------------------------------------------
+
+    fun copySelected() {
+        _clipboard.value = selectedWidget() ?: return
+        _hasClipboard.value = true
+    }
+
+    fun pasteClipboard() {
+        val clip = _clipboard.value ?: return
+        pushUndo()
+        val (next, newId) = com.bluepilot.remote.domain.EditorProOps.paste(_layout.value, clip)
+        _layout.value = next
+        newId?.let { _selectedId.value = it }
+        _dirty.value = true
+        _saved.value = false
+    }
+
+    fun bringToFront() { val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.bringToFront(it, id) } }
+
+    fun sendToBack() { val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.sendToBack(it, id) } }
+
+    fun centerSelectedH() { val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.centerHorizontally(it, id) } }
+
+    fun centerSelectedV() { val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.centerVertically(it, id) } }
+
+    fun snapSelectedToEdge(edge: com.bluepilot.remote.domain.EditorProOps.Edge) {
+        val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.snapToEdge(it, id, edge) }
+    }
+
+    fun nudgeSelected(dx: Float, dy: Float) {
+        val id = _selectedId.value ?: return
+        mutate { com.bluepilot.remote.domain.EditorProOps.nudge(it, id, dx, dy) }
+    }
+
+    /** Long-press toggles a widget in/out of the multi-selection. */
+    fun toggleMultiSelect(id: String) {
+        if (_previewMode.value) return
+        _multiSelection.value =
+            if (id in _multiSelection.value) _multiSelection.value - id
+            else _multiSelection.value + id
+    }
+
+    fun clearMultiSelect() { _multiSelection.value = emptySet() }
+
+    fun moveMultiSelection(dx: Float, dy: Float) {
+        if (_multiSelection.value.isEmpty()) return
+        _layout.value = com.bluepilot.remote.domain.EditorProOps
+            .moveMany(_layout.value, _multiSelection.value, dx, dy)
+        _dirty.value = true
+        _saved.value = false
+    }
+
+    fun deleteMultiSelection() {
+        if (_multiSelection.value.isEmpty()) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.removeMany(it, _multiSelection.value) }
+        _multiSelection.value = emptySet()
+        _selectedId.value = null
+    }
+
+    fun duplicateMultiSelection() {
+        if (_multiSelection.value.isEmpty()) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.duplicateMany(it, _multiSelection.value) }
+    }
+
+    fun distributeMultiH() {
+        if (_multiSelection.value.size < 3) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.distributeHorizontally(it, _multiSelection.value.toList()) }
+    }
+
+    fun distributeMultiV() {
+        if (_multiSelection.value.size < 3) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.distributeVertically(it, _multiSelection.value.toList()) }
+    }
+
+    fun groupMultiSelection() {
+        if (_multiSelection.value.size < 2) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.group(it, _multiSelection.value).first }
+    }
+
+    fun ungroupSelected() {
+        val w = selectedWidget() ?: return
+        if (w.groupId.isBlank()) return
+        mutate { com.bluepilot.remote.domain.EditorProOps.ungroup(it, w.groupId) }
+    }
+
+    fun toggleGrid() { _showGrid.value = !_showGrid.value }
+
+    fun setZoom(z: Float) { _zoom.value = z.coerceIn(1f, 2.5f) }
+
+    /** SECTION 2 — profile metadata (category folder + notes). */
+    fun setCategory(category: String) = mutate { it.copy(category = category) }
+    fun setNotes(notes: String) = mutate { it.copy(notes = notes) }
 
     /**
      * Persist to Room. Built-in profiles are saved as a NEW user copy

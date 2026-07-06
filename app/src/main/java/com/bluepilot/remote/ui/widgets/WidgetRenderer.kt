@@ -73,12 +73,18 @@ fun LayoutCanvas(
         val canvasH = maxHeight
         layout.widgets.filter { it.style.visible }.forEach { widget ->
             val frame = widget.frame.sanitized()
+            // SECTION 4 — accessibility: interactive widgets never render
+            // below the 48dp Material touch-target floor, even if the user
+            // resized them smaller in the editor.
+            val minTouch = com.bluepilot.remote.ui.theme.Dimens.TOUCH_TARGET
+            val w = (canvasW * frame.w).coerceAtLeast(minTouch)
+            val h = (canvasH * frame.h).coerceAtLeast(minTouch)
             RenderWidget(
                 widget = widget,
                 events = events,
                 modifier = Modifier
                     .offset(x = canvasW * frame.x, y = canvasH * frame.y)
-                    .size(width = canvasW * frame.w, height = canvasH * frame.h)
+                    .size(width = w, height = h)
             )
         }
     }

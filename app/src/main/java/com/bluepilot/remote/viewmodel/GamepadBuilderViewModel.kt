@@ -46,7 +46,9 @@ class GamepadBuilderViewModel @Inject constructor(
     observeConnection: ObserveConnectionUseCase,
     private val sendAction: SendHidActionUseCase,
     private val sensors: MotionSensorSource,
-    private val haptics: com.bluepilot.remote.haptics.Haptics
+    private val haptics: com.bluepilot.remote.haptics.Haptics,
+    private val versionStore: com.bluepilot.remote.data.gamepad.GamepadVersionStore,
+    private val settingsStore: com.bluepilot.remote.domain.SettingsStore
 ) : ViewModel() {
 
     // ------------------------------------------------------------------
@@ -189,12 +191,22 @@ class GamepadBuilderViewModel @Inject constructor(
         viewModelScope.launch {
             // BUGFIX: cancel any running turbo before switching profiles so a
             // held rapid-fire button can't keep firing into the new profile.
-            turboJobs.values.forEach { it.cancel() }
-            turboJobs.clear()
+            cancelRuntimeJobs()
             hidState = GamepadSnapshot()
             sendAction(HidAction.GamepadUpdate(hidState))
             _playing.value = repository.byId(id)
+            recordRecent(id)   // ADV S3 — recents quick-access row
         }
+    }
+
+    /** ADV S1 — cancel turbo/arrow jobs + clear latched toggle states. */
+    private fun cancelRuntimeJobs() {
+        turboJobs.values.forEach { it.cancel() }
+        turboJobs.clear()
+        arrowJobs.values.forEach { it.cancel() }
+        arrowJobs.clear()
+        toggleStates.clear()
+        lastTapAt.clear()
     }
 
     /** Quick-switch to next profile while playing (wraps). */
@@ -209,8 +221,7 @@ class GamepadBuilderViewModel @Inject constructor(
     }
 
     fun stopPlaying() {
-        turboJobs.values.forEach { it.cancel() }
-        turboJobs.clear()
+        cancelRuntimeJobs()
         setMotionEnabled(false)
         neutralizeHid()
         _playing.value = null
@@ -269,6 +280,100 @@ class GamepadBuilderViewModel @Inject constructor(
     // Turbo/rapid-fire jobs per control id (cancelled on release).
     private val turboJobs = mutableMapOf<String, Job>()
 
+    // ADV S1 — toggle-button latched states per control id.
+    private val toggleStates = mutableMapOf<String, Boolean>()
+    // ADV S1 — multi-tap: last tap timestamp per control id.
+    private val lastTapAt = mutableMapOf<String, Long>()
+    // ADV S1 — arrow hold-to-repeat jobs.
+    private val arrowJobs = mutableMapOf<String, Job>()
+
+    /** ADV S1 — toggle button: tap flips latched ON/OFF state. */
+    fun onToggleButton(control: GamepadControlSpec) {
+        val latched = com.bluepilot.remote.domain.AdvancedControls
+            .toggleAfterTap(toggleStates[control.id] ?: false)
+        toggleStates[control.id] = latched
+        hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, latched)
+        sendAction(HidAction.GamepadUpdate(hidState))
+        haptics.play(control.haptic)
+    }
+
+    /** ADV S1 — multi-tap: single tap = primary, double tap = secondary. */
+    fun onMultiTap(control: GamepadControlSpec) {
+        val now = System.currentTimeMillis()
+        val isDouble = now - (lastTapAt[control.id] ?: 0L) <= control.multiTapWindowMs
+        lastTapAt[control.id] = if (isDouble) 0L else now
+        val index = if (isDouble) control.secondaryButtonIndex else control.buttonIndex
+        viewModelScope.launch {
+            hidState = GamepadRuntimeCore.withButton(hidState, index, true)
+            sendAction(HidAction.GamepadUpdate(hidState))
+            delay(40)
+            hidState = GamepadRuntimeCore.withButton(hidState, index, false)
+            sendAction(HidAction.GamepadUpdate(hidState))
+        }
+        haptics.play(control.haptic)
+    }
+
+    /** ADV S1 — radial wheel option chosen: tap that button index. */
+    fun onRadialPick(control: GamepadControlSpec, index: Int) {
+        viewModelScope.launch {
+            hidState = GamepadRuntimeCore.withButton(hidState, index.coerceIn(0, 15), true)
+            sendAction(HidAction.GamepadUpdate(hidState))
+            delay(40)
+            hidState = GamepadRuntimeCore.withButton(hidState, index.coerceIn(0, 15), false)
+            sendAction(HidAction.GamepadUpdate(hidState))
+        }
+        haptics.play(control.haptic)
+    }
+
+    /** ADV S1 — independent arrow button: press/release one hat direction. */
+    fun onArrow(control: GamepadControlSpec, pressed: Boolean) {
+        arrowJobs.remove(control.id)?.cancel()
+        val hat = if (control.diagonalOnly)
+            com.bluepilot.remote.domain.AdvancedControls.diagonalOnly(control.arrowDirection.hat)
+        else control.arrowDirection.hat
+        if (pressed) {
+            if (control.arrowRepeat) {
+                // Hold-to-repeat: pulse direction/neutral at arrowRepeatRate.
+                arrowJobs[control.id] = viewModelScope.launch {
+                    val period = 1000L / control.arrowRepeatRate.coerceIn(2, 30)
+                    while (true) {
+                        hidState = GamepadRuntimeCore.withHat(hidState, hat)
+                        sendAction(HidAction.GamepadUpdate(hidState))
+                        delay(period / 2)
+                        hidState = GamepadRuntimeCore.withHat(hidState, 8)
+                        sendAction(HidAction.GamepadUpdate(hidState))
+                        delay(period / 2)
+                    }
+                }
+            } else {
+                hidState = GamepadRuntimeCore.withHat(hidState, hat)
+                sendAction(HidAction.GamepadUpdate(hidState))
+            }
+            haptics.play(control.haptic)
+        } else {
+            if (hidState.hat != 8) {
+                hidState = GamepadRuntimeCore.withHat(hidState, 8)
+                sendAction(HidAction.GamepadUpdate(hidState))
+            }
+        }
+    }
+
+    /** ADV S1 — combo zone: zone 0 = buttonIndex (bumper), 1 = comboSecondIndex (trigger). */
+    fun onComboZone(control: GamepadControlSpec, zone: Int, pressed: Boolean) {
+        val index = if (zone == 0) control.buttonIndex else control.comboSecondIndex
+        hidState = GamepadRuntimeCore.withButton(hidState, index, pressed)
+        sendAction(HidAction.GamepadUpdate(hidState))
+        if (pressed) haptics.play(control.haptic)
+    }
+
+    /** ADV S1 — stick click (L3/R3): long-press on the stick knob. */
+    fun onStickClick(control: GamepadControlSpec, pressed: Boolean) {
+        if (control.stickClickIndex < 0) return
+        hidState = GamepadRuntimeCore.withButton(hidState, control.stickClickIndex, pressed)
+        sendAction(HidAction.GamepadUpdate(hidState))
+        if (pressed) haptics.play(control.haptic)
+    }
+
     fun onButton(control: GamepadControlSpec, pressed: Boolean) {
         if (control.turbo && pressed) {
             // SECTION 5 — turbo: auto-repeat press/release at turboRate Hz
@@ -300,11 +405,23 @@ class GamepadBuilderViewModel @Inject constructor(
     }
 
     fun onStick(control: GamepadControlSpec, x: Float, y: Float) {
+        // ADV S1 pipeline: outer range → square gate → curve+sens → anti-deadzone → deadzone.
+        val adv = com.bluepilot.remote.domain.AdvancedControls
+        var px = adv.outerRange(x, control.outerRange)
+        var py = adv.outerRange(y, control.outerRange)
+        if (control.stickGate == com.bluepilot.remote.model.gamepad.StickGate.SQUARE) {
+            val (gx, gy) = adv.squareGate(px, py)
+            px = gx; py = gy
+        }
         // SECTION 5 — response curve + per-profile sensitivity before dead zone.
         val sens = ((_playing.value ?: run { null })?.spec?.stickSensitivity
             ?: draft.value?.second?.stickSensitivity ?: 70) / 100f * 1.4f + 0.3f
-        val cx = ResponseCurves.apply(x, control.curve) * sens
-        val cy = ResponseCurves.apply(y, control.curve) * sens
+        var cx = ResponseCurves.apply(px, control.curve) * sens
+        var cy = ResponseCurves.apply(py, control.curve) * sens
+        if (control.antiDeadZone > 0) {
+            cx = adv.antiDeadZone(cx.coerceIn(-1f, 1f), control.antiDeadZone)
+            cy = adv.antiDeadZone(cy.coerceIn(-1f, 1f), control.antiDeadZone)
+        }
         hidState = GamepadRuntimeCore.withStick(
             hidState, control.stickSide,
             cx.coerceIn(-1f, 1f), cy.coerceIn(-1f, 1f), control.deadZone
@@ -313,7 +430,15 @@ class GamepadBuilderViewModel @Inject constructor(
     }
 
     fun onDpadTouch(control: GamepadControlSpec, dx: Float, dy: Float) {
-        val hat = GamepadRuntimeCore.hatFromTouch(dx, dy, control.eightWay)
+        // ADV S1 — circular style = continuous 8-way; diagonal-only filter.
+        var hat = if (control.dpadStyle == com.bluepilot.remote.model.gamepad.DpadStyle.CIRCULAR) {
+            com.bluepilot.remote.domain.AdvancedControls.circularHat(dx, dy)
+        } else {
+            GamepadRuntimeCore.hatFromTouch(dx, dy, control.eightWay)
+        }
+        if (control.diagonalOnly) {
+            hat = com.bluepilot.remote.domain.AdvancedControls.diagonalOnly(hat)
+        }
         if (hat != hidState.hat) {
             hidState = GamepadRuntimeCore.withHat(hidState, hat)
             sendAction(HidAction.GamepadUpdate(hidState))
@@ -394,6 +519,17 @@ class GamepadBuilderViewModel @Inject constructor(
                 id = newId, type = type, frame = WidgetFrame(0.30f, 0.50f, 0.18f, 0.34f),
                 color = 0xFF1A2238
             )
+            // ADV S1 — new control types.
+            GamepadControlType.ARROW -> GamepadControlSpec(
+                id = newId, type = type, frame = WidgetFrame(0.46f, 0.62f, 0.09f, 0.16f),
+                label = "▲", color = 0xFF1A2238,
+                arrowDirection = com.bluepilot.remote.model.gamepad.ArrowDirection.UP
+            )
+            GamepadControlType.COMBO -> GamepadControlSpec(
+                id = newId, type = type, frame = WidgetFrame(0.02f, 0.04f, 0.16f, 0.26f),
+                shape = com.bluepilot.remote.model.gamepad.ControlShape.ROUNDED,
+                label = "L", buttonIndex = 4, comboSecondIndex = 6, color = 0xFF1A2238
+            )
         }
         mutate { it.copy(controls = it.controls + defaults.sanitized()) }
         _selectedId.value = newId
@@ -416,7 +552,114 @@ class GamepadBuilderViewModel @Inject constructor(
 
     /** Continuous drag/resize — undo captured once at gesture start. */
     fun moveSelected(x: Float, y: Float) = updateSelected(withUndo = false) {
-        it.copy(frame = it.frame.copy(x = x, y = y).sanitized())
+        // ADV S2 — magnetic grid snap while dragging.
+        val grid = _draft.value?.second?.gridSize ?: 0f
+        it.copy(frame = it.frame.copy(
+            x = com.bluepilot.remote.domain.LayoutIntelligence.snap(x, grid),
+            y = com.bluepilot.remote.domain.LayoutIntelligence.snap(y, grid)
+        ).sanitized())
+    }
+
+    // ------------------------------------------------------------------
+    // ADV SECTION 2 — layout intelligence
+    // ------------------------------------------------------------------
+
+    fun setGridSize(size: Float) = mutate(withUndo = false) { it.copy(gridSize = size.coerceIn(0f, 0.25f)) }
+
+    /** Symmetry tool: mirrored copy of the selected control on the other side. */
+    fun mirrorSelected() {
+        val control = selectedControl() ?: return
+        val spec = _draft.value?.second ?: return
+        if (spec.controls.size >= GamepadLayoutSpec.MAX_CONTROLS) return
+        val newId = UUID.randomUUID().toString()
+        mutate { it.copy(controls = it.controls +
+            com.bluepilot.remote.domain.LayoutIntelligence.mirrorCopy(control, newId)) }
+        _selectedId.value = newId
+    }
+
+    /** One-tap handedness flip of the whole layout. */
+    fun mirrorWholeLayout() =
+        mutate { com.bluepilot.remote.domain.LayoutIntelligence.mirrorLayout(it) }
+
+    /** Live spacing warnings (mis-tap risk pairs). */
+    fun spacingWarnings(): List<com.bluepilot.remote.domain.LayoutIntelligence.SpacingWarning> =
+        _draft.value?.second?.let {
+            com.bluepilot.remote.domain.LayoutIntelligence.spacingWarnings(it)
+        } ?: emptyList()
+
+    /** Alignment guides for the control being dragged. */
+    fun alignmentGuides(id: String): com.bluepilot.remote.domain.LayoutIntelligence.AlignmentGuides? =
+        _draft.value?.second?.let {
+            com.bluepilot.remote.domain.LayoutIntelligence.alignmentGuides(it, id)
+        }
+
+    // Thumb-reach heatmap overlay state (editor only, not persisted).
+    private val _heatmapGrip = MutableStateFlow<com.bluepilot.remote.domain.LayoutIntelligence.GripStyle?>(null)
+    val heatmapGrip: StateFlow<com.bluepilot.remote.domain.LayoutIntelligence.GripStyle?> = _heatmapGrip.asStateFlow()
+    fun setHeatmapGrip(grip: com.bluepilot.remote.domain.LayoutIntelligence.GripStyle?) { _heatmapGrip.value = grip }
+
+    // ------------------------------------------------------------------
+    // ADV S2 — shift layer (Fn-style second layer)
+    // ------------------------------------------------------------------
+
+    /** Which layer is live while playing: 0 = base, 1 = shift held. */
+    private val _activeLayer = MutableStateFlow(0)
+    val activeLayer: StateFlow<Int> = _activeLayer.asStateFlow()
+
+    fun setSelectedLayer(layer: Int) = updateSelected { it.copy(layer = layer.coerceIn(0, 1)) }
+
+    fun setSelectedAsShift() {
+        val id = _selectedId.value ?: return
+        mutate { it.copy(shiftControlId = if (it.shiftControlId == id) "" else id) }
+    }
+
+    /** Called by the renderer when the shift control is pressed/released. */
+    fun onShift(pressed: Boolean) { _activeLayer.value = if (pressed) 1 else 0 }
+
+    // ------------------------------------------------------------------
+    // ADV S2 — Test Mode: real HID keycode display + measured latency
+    // ------------------------------------------------------------------
+
+    data class TestEvent(
+        val label: String,
+        /** Human-readable wire description, e.g. "button 3 ↓ (bit 2, btnLo=0x04)". */
+        val wire: String,
+        /** REAL measured enqueue→post-send duration in microseconds. */
+        val latencyUs: Long,
+        val at: Long = System.currentTimeMillis()
+    )
+
+    private val _testMode = MutableStateFlow(false)
+    val testMode: StateFlow<Boolean> = _testMode.asStateFlow()
+    fun setTestMode(on: Boolean) { _testMode.value = on; if (!on) _testEvents.value = emptyList() }
+
+    private val _testEvents = MutableStateFlow<List<TestEvent>>(emptyList())
+    val testEvents: StateFlow<List<TestEvent>> = _testEvents.asStateFlow()
+
+    /**
+     * Records a REAL test event: wire bytes come from the actual
+     * HidReportBuilder output for the current snapshot; latency is the
+     * measured time for the send call to be dispatched (System.nanoTime
+     * around the sendAction handoff — real, not simulated).
+     */
+    private fun recordTestEvent(label: String, describe: String) {
+        if (!_testMode.value) return
+        val report = com.bluepilot.remote.hid.HidReportBuilder.gamepad(hidState)
+        val hex = report.joinToString(" ") { String.format("%02X", it) }
+        val t0 = System.nanoTime()
+        sendAction(HidAction.GamepadUpdate(hidState))
+        val dispatchUs = (System.nanoTime() - t0) / 1000
+        _testEvents.value = (listOf(
+            TestEvent(label, "$describe  [${hex}]", dispatchUs)
+        ) + _testEvents.value).take(30)
+    }
+
+    fun testPress(control: GamepadControlSpec, pressed: Boolean) {
+        hidState = GamepadRuntimeCore.withButton(hidState, control.buttonIndex, pressed)
+        recordTestEvent(
+            control.label.ifBlank { "B${control.buttonIndex + 1}" },
+            "HID btn ${control.buttonIndex + 1} ${if (pressed) "↓" else "↑"}"
+        )
     }
 
     fun resizeSelected(w: Float, h: Float) = updateSelected(withUndo = false) {
@@ -439,6 +682,13 @@ class GamepadBuilderViewModel @Inject constructor(
                 if (draftIsBuiltIn) {
                     repository.save(null, spec.copy(name = spec.name + " (custom)"))
                 } else {
+                    // ADV S3 — versioning: archive the CURRENT stored spec
+                    // before overwriting, so users can revert bad edits.
+                    if (rowId != null) {
+                        repository.byId(rowId)?.let { existing ->
+                            if (existing.spec != spec) versionStore.push(rowId, existing.spec)
+                        }
+                    }
                     repository.save(rowId, spec)
                 }
             }.onSuccess {
@@ -450,6 +700,118 @@ class GamepadBuilderViewModel @Inject constructor(
             }
         }
     }
+
+    // ------------------------------------------------------------------
+    // ADV SECTION 3 — versioning / A-B compare / favorites / tags / search
+    // ------------------------------------------------------------------
+
+    /** Version history of the profile being edited (newest first). */
+    private val _versions = MutableStateFlow<List<GamepadLayoutSpec>>(emptyList())
+    val versions: StateFlow<List<GamepadLayoutSpec>> = _versions.asStateFlow()
+
+    fun loadVersions() {
+        val rowId = _draft.value?.first ?: return
+        _versions.value = versionStore.versions(rowId)
+    }
+
+    /** Revert the draft to a stored version (current draft goes to undo). */
+    fun revertTo(version: GamepadLayoutSpec) {
+        pushUndo()
+        _draft.value = _draft.value?.first to version.sanitized()
+        _message.value = "Reverted — Save to keep this version."
+    }
+
+    // A/B comparison: hold slot B; toggle swaps draft <-> B instantly.
+    private val _abSlot = MutableStateFlow<GamepadLayoutSpec?>(null)
+    val hasAbSlot: StateFlow<Boolean> get() = _hasAbSlot
+    private val _hasAbSlot = MutableStateFlow(false)
+
+    fun setAbSlot() {
+        _abSlot.value = _draft.value?.second
+        _hasAbSlot.value = _abSlot.value != null
+        _message.value = "Layout stored as B — edit freely, then toggle A/B."
+    }
+
+    fun toggleAb() {
+        val b = _abSlot.value ?: return
+        val current = _draft.value?.second ?: return
+        _abSlot.value = current
+        _draft.value = _draft.value?.first to b
+    }
+
+    // ----- Favorites / recents (CSV in DataStore, same codec as themes) -----
+
+    val appSettings: StateFlow<com.bluepilot.remote.model.AppSettings> =
+        settingsStore.appSettings.stateIn(viewModelScope, SharingStarted.Eagerly, com.bluepilot.remote.model.AppSettings())
+
+    fun toggleFavorite(id: Long) {
+        viewModelScope.launch {
+            val cur = appSettings.value
+            settingsStore.updateApp(cur.copy(
+                favoriteGamepads = com.bluepilot.remote.ui.theme.ThemeListCodec.toggle(cur.favoriteGamepads, id.toString())
+            ))
+        }
+    }
+
+    fun isFavorite(id: Long): Boolean =
+        com.bluepilot.remote.ui.theme.ThemeListCodec.contains(appSettings.value.favoriteGamepads, id.toString())
+
+    private fun recordRecent(id: Long) {
+        viewModelScope.launch {
+            val cur = appSettings.value
+            settingsStore.updateApp(cur.copy(
+                recentGamepads = com.bluepilot.remote.ui.theme.ThemeListCodec.push(cur.recentGamepads, id.toString())
+            ))
+        }
+    }
+
+    // ----- Tags + search -----
+
+    fun toggleTag(tag: String) = mutate {
+        it.copy(tags = if (tag in it.tags) it.tags - tag else it.tags + tag)
+    }
+
+    private val _profileQuery = MutableStateFlow("")
+    val profileQuery: StateFlow<String> = _profileQuery.asStateFlow()
+    fun setProfileQuery(q: String) { _profileQuery.value = q }
+
+    private val _tagFilter = MutableStateFlow<String?>(null)
+    val tagFilter: StateFlow<String?> = _tagFilter.asStateFlow()
+    fun setTagFilter(tag: String?) { _tagFilter.value = tag }
+
+    /** Profiles filtered by search text + tag, favorites first. */
+    val filteredProfiles: StateFlow<List<GamepadProfile>> =
+        kotlinx.coroutines.flow.combine(
+            profiles, _profileQuery, _tagFilter, appSettings
+        ) { list, q, tag, settings ->
+            val favs = com.bluepilot.remote.ui.theme.ThemeListCodec.decode(settings.favoriteGamepads)
+            list.filter { p ->
+                (q.isBlank() || p.spec.name.contains(q, true) ||
+                    p.spec.tags.any { it.contains(q, true) }) &&
+                    (tag == null || tag in p.spec.tags)
+            }.sortedByDescending { it.id.toString() in favs }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Recently played profiles resolved against the live list. */
+    val recentProfiles: StateFlow<List<GamepadProfile>> =
+        kotlinx.coroutines.flow.combine(profiles, appSettings) { list, settings ->
+            com.bluepilot.remote.ui.theme.ThemeListCodec.decode(settings.recentGamepads)
+                .mapNotNull { idStr -> list.firstOrNull { it.id.toString() == idStr } }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * ADV S3 — contextual suggestion from the REAL connected host device:
+     * classifies by name captured from the live HID connection state.
+     */
+    val suggestedTags: StateFlow<List<String>> = observeConnection()
+        .map { state ->
+            val name = (state as? com.bluepilot.remote.model.HidConnectionState.Connected)?.device?.name ?: ""
+            if (name.isBlank()) emptyList()
+            else com.bluepilot.remote.domain.ProfileSuggester.suggestedTags(
+                com.bluepilot.remote.domain.ProfileSuggester.classify(0, name)
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ------------------------------------------------------------------
     // Import / export

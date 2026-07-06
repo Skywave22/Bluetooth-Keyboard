@@ -46,7 +46,9 @@ object BuiltInThemes {
         id = "hawaii_night",
         name = "Hawaii Night",
         isDark = true,
-        primary = Color(0xFF00B4C6), onPrimary = Color.White,
+        // SECTION 4 accessibility fix: white on bright teal was 2.5:1 —
+        // dark ink on teal reads at ~7:1 (standard for cyan primaries).
+        primary = Color(0xFF00B4C6), onPrimary = Color(0xFF042A30),
         secondary = Color(0xFFFF6B5E),
         background = Color(0xFF06222B), onBackground = Color(0xFFE2F6F8),
         surface = Color(0xFF0C3340), onSurface = Color(0xFFE2F6F8),
@@ -313,7 +315,8 @@ object BuiltInThemes {
 
     val PASTEL = AppThemeSpec(
         id = "pastel", name = "Pastel Soft", isDark = false,
-        primary = Color(0xFF7C9EF5), onPrimary = Color.White,
+        // SECTION 4 accessibility fix: white on pastel blue was 2.6:1.
+        primary = Color(0xFF7C9EF5), onPrimary = Color(0xFF1B2B52),
         secondary = Color(0xFFF5A9C4),
         background = Color(0xFFFDF7FA), onBackground = Color(0xFF3A3A4A),
         surface = Color(0xFFFFFFFF), onSurface = Color(0xFF3A3A4A),

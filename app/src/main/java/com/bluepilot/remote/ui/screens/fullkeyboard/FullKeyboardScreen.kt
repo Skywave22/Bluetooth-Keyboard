@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import com.bluepilot.remote.ui.components.bestContentColor
 import com.bluepilot.remote.ui.components.toComposeColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.bluepilot.remote.model.HidKeys
 import com.bluepilot.remote.model.HidModifiers
 import com.bluepilot.remote.model.keyboard.KeySpec
+import com.bluepilot.remote.ui.components.HintBar
 import com.bluepilot.remote.ui.components.NotConnectedBanner
 import com.bluepilot.remote.ui.components.rememberHaptic
 import com.bluepilot.remote.viewmodel.FullKeyboardViewModel
@@ -118,6 +120,7 @@ fun FullKeyboardScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             NotConnectedBanner(!isConnected)
+            HintBar("Long-press a key for its secondary symbol • edit mode: tap keys to recolor")
             if (editMode) {
                 Text(
                     "EDIT MODE — long-press any key to customize it",
@@ -233,7 +236,7 @@ private fun KeyCap(
             Text(
                 text = key.label,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (custom != null) Color.White else MaterialTheme.colorScheme.onSurface,
+                color = if (custom != null) custom.bestContentColor() else MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 2.dp, vertical = 6.dp)
             )
