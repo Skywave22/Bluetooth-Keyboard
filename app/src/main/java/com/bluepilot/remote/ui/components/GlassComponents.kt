@@ -168,3 +168,28 @@ fun Modifier.cornerBrackets(
     drawLine(color, Offset(w, h), Offset(w - length, h), strokeWidth = stroke)
     drawLine(color, Offset(w, h), Offset(w, h - length), strokeWidth = stroke)
 }
+
+/**
+ * SECTION 4 — one-line contextual hint bar for non-obvious gestures
+ * (long-press, swipe zones). Subtle, dismiss-free, theme-aware.
+ */
+@Composable
+fun HintBar(text: String, modifier: Modifier = Modifier) {
+    val spec = LocalAppTheme.current
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .background(
+                spec.surfaceVariant.copy(alpha = 0.45f),
+                RoundedCornerShape(10.dp)
+            )
+    ) {
+        androidx.compose.material3.Text(
+            text = "💡 $text",
+            style = MaterialTheme.typography.bodyMedium,
+            color = spec.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}

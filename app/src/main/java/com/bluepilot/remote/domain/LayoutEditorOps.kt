@@ -172,3 +172,151 @@ object LayoutEditorOps {
         return result
     }
 }
+
+// ----------------------------------------------------------------------
+// SECTION 2 — Combo Maker upgrade: pure ops (all unit-tested)
+// ----------------------------------------------------------------------
+
+/**
+ * Professional editing operations added by the Combo Maker upgrade:
+ * alignment, distribution, layering, nudge, clipboard paste, multi-select
+ * and grouping. All are pure functions on LayoutSpec.
+ */
+object EditorProOps {
+
+    // ---------- Layering (list order = z-order; later = on top) ----------
+
+    fun bringToFront(layout: LayoutSpec, id: String): LayoutSpec {
+        val w = layout.widgets.firstOrNull { it.id == id } ?: return layout
+        return layout.copy(widgets = layout.widgets.filterNot { it.id == id } + w)
+    }
+
+    fun sendToBack(layout: LayoutSpec, id: String): LayoutSpec {
+        val w = layout.widgets.firstOrNull { it.id == id } ?: return layout
+        return layout.copy(widgets = listOf(w) + layout.widgets.filterNot { it.id == id })
+    }
+
+    // ---------- Alignment ----------
+
+    fun centerHorizontally(layout: LayoutSpec, id: String): LayoutSpec =
+        LayoutEditorOps.updateWidget(layout, id) { w ->
+            w.copy(frame = w.frame.copy(x = (1f - w.frame.w) / 2f).sanitized())
+        }
+
+    fun centerVertically(layout: LayoutSpec, id: String): LayoutSpec =
+        LayoutEditorOps.updateWidget(layout, id) { w ->
+            w.copy(frame = w.frame.copy(y = (1f - w.frame.h) / 2f).sanitized())
+        }
+
+    enum class Edge { LEFT, RIGHT, TOP, BOTTOM }
+
+    fun snapToEdge(layout: LayoutSpec, id: String, edge: Edge, margin: Float = 0.02f): LayoutSpec =
+        LayoutEditorOps.updateWidget(layout, id) { w ->
+            val f = w.frame
+            val nf = when (edge) {
+                Edge.LEFT -> f.copy(x = margin)
+                Edge.RIGHT -> f.copy(x = 1f - f.w - margin)
+                Edge.TOP -> f.copy(y = margin)
+                Edge.BOTTOM -> f.copy(y = 1f - f.h - margin)
+            }
+            w.copy(frame = nf.sanitized())
+        }
+
+    /** Distribute [ids] evenly along X (by left edge order). */
+    fun distributeHorizontally(layout: LayoutSpec, ids: List<String>): LayoutSpec {
+        if (ids.size < 3) return layout
+        val sel = layout.widgets.filter { it.id in ids }.sortedBy { it.frame.x }
+        if (sel.size < 3) return layout
+        val first = sel.first().frame.x
+        val last = sel.last().frame.x
+        val step = (last - first) / (sel.size - 1)
+        var result = layout
+        sel.forEachIndexed { i, w ->
+            result = LayoutEditorOps.updateWidget(result, w.id) {
+                it.copy(frame = it.frame.copy(x = first + step * i).sanitized())
+            }
+        }
+        return result
+    }
+
+    /** Distribute [ids] evenly along Y (by top edge order). */
+    fun distributeVertically(layout: LayoutSpec, ids: List<String>): LayoutSpec {
+        if (ids.size < 3) return layout
+        val sel = layout.widgets.filter { it.id in ids }.sortedBy { it.frame.y }
+        if (sel.size < 3) return layout
+        val first = sel.first().frame.y
+        val last = sel.last().frame.y
+        val step = (last - first) / (sel.size - 1)
+        var result = layout
+        sel.forEachIndexed { i, w ->
+            result = LayoutEditorOps.updateWidget(result, w.id) {
+                it.copy(frame = it.frame.copy(y = first + step * i).sanitized())
+            }
+        }
+        return result
+    }
+
+    // ---------- Nudge (precise keyboard-style movement) ----------
+
+    fun nudge(layout: LayoutSpec, id: String, dx: Float, dy: Float): LayoutSpec =
+        LayoutEditorOps.updateWidget(layout, id) { w ->
+            w.copy(frame = w.frame.copy(x = w.frame.x + dx, y = w.frame.y + dy).sanitized())
+        }
+
+    // ---------- Clipboard ----------
+
+    /** Paste a copied widget as a NEW widget slightly offset. */
+    fun paste(layout: LayoutSpec, clip: WidgetSpec): Pair<LayoutSpec, String?> {
+        if (layout.widgets.size >= LayoutSpec.MAX_WIDGETS) return layout to null
+        val newId = UUID.randomUUID().toString()
+        val w = clip.copy(
+            id = newId,
+            frame = clip.frame.copy(x = clip.frame.x + 0.05f, y = clip.frame.y + 0.05f).sanitized()
+        ).sanitized()
+        return layout.copy(widgets = layout.widgets + w) to newId
+    }
+
+    // ---------- Multi-select ----------
+
+    fun moveMany(layout: LayoutSpec, ids: Set<String>, dx: Float, dy: Float): LayoutSpec =
+        layout.copy(widgets = layout.widgets.map { w ->
+            if (w.id in ids)
+                w.copy(frame = w.frame.copy(x = w.frame.x + dx, y = w.frame.y + dy).sanitized())
+            else w
+        })
+
+    fun removeMany(layout: LayoutSpec, ids: Set<String>): LayoutSpec =
+        layout.copy(widgets = layout.widgets.filterNot { it.id in ids })
+
+    fun duplicateMany(layout: LayoutSpec, ids: Set<String>): LayoutSpec {
+        var result = layout
+        ids.forEach { id ->
+            if (result.widgets.size < LayoutSpec.MAX_WIDGETS) {
+                result = LayoutEditorOps.duplicate(result, id).first
+            }
+        }
+        return result
+    }
+
+    // ---------- Grouping ----------
+
+    /** Assign all [ids] one new group. Returns (layout, groupId). */
+    fun group(layout: LayoutSpec, ids: Set<String>): Pair<LayoutSpec, String> {
+        val gid = UUID.randomUUID().toString()
+        return layout.copy(widgets = layout.widgets.map { w ->
+            if (w.id in ids) w.copy(groupId = gid) else w
+        }) to gid
+    }
+
+    fun ungroup(layout: LayoutSpec, groupId: String): LayoutSpec =
+        layout.copy(widgets = layout.widgets.map { w ->
+            if (w.groupId == groupId) w.copy(groupId = "") else w
+        })
+
+    /** Ids of every widget sharing [id]'s group (incl. itself). */
+    fun groupMembers(layout: LayoutSpec, id: String): Set<String> {
+        val w = layout.widgets.firstOrNull { it.id == id } ?: return setOf(id)
+        if (w.groupId.isBlank()) return setOf(id)
+        return layout.widgets.filter { it.groupId == w.groupId }.map { it.id }.toSet()
+    }
+}

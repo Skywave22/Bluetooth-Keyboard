@@ -82,6 +82,13 @@ class HidEngine @Inject constructor(
     private val _state = MutableStateFlow<HidConnectionState>(HidConnectionState.Idle)
     override val state: StateFlow<HidConnectionState> = _state.asStateFlow()
 
+    /** ADV S5 — real measured connection-health metrics (public read). */
+    val health = com.bluepilot.remote.domain.ConnectionHealthTracker()
+
+    /** ADV S5 — reconnect status for the dashboard (attempt#, max). */
+    private val _reconnectStatus = MutableStateFlow<Pair<Int, Int>?>(null)
+    val reconnectStatus: StateFlow<Pair<Int, Int>?> = _reconnectStatus.asStateFlow()
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
@@ -284,14 +291,19 @@ class HidEngine @Inject constructor(
         }
     }
 
-    /** Sends one raw report; false (and log) on any failure. Never throws. */
+    /** Sends one raw report; false (and log) on any failure. Never throws.
+     *  ADV S5: every send is timed (System.nanoTime around the REAL
+     *  framework call) and fed to the health tracker. */
     private fun report(id: Int, data: ByteArray): Boolean {
         val hd = hidDevice
         val dev = connectedDevice
         if (hd == null || dev == null) return false
-        return runCatching { hd.sendReport(dev, id, data) }
+        val t0 = System.nanoTime()
+        val ok = runCatching { hd.sendReport(dev, id, data) }
             .onFailure { Timber.w(it, "sendReport(id=%d) failed", id) }
             .getOrDefault(false)
+        health.onReport(ok, (System.nanoTime() - t0) / 1000)
+        return ok
     }
 
     // ------------------------------------------------------------------
@@ -361,6 +373,8 @@ class HidEngine @Inject constructor(
                     connectedDevice = device
                     lastHostDevice = device
                     reconnectAttempts = 0
+                    _reconnectStatus.value = null           // ADV S5
+                    health.markConnected()                   // ADV S5
                     device?.let { _state.value = HidConnectionState.Connected(it.toRemote()) }
                 }
                 BluetoothProfile.STATE_CONNECTING ->
@@ -369,6 +383,7 @@ class HidEngine @Inject constructor(
                     val wasConnected = connectedDevice != null
                     connectedDevice = null
                     _state.value = HidConnectionState.Idle
+                    if (wasConnected) health.markDisconnected()   // ADV S5
                     if (wasConnected && !userInitiatedDisconnect) scheduleReconnect()
                 }
                 // STATE_DISCONNECTING: transient; we wait for DISCONNECTED.
@@ -393,10 +408,13 @@ class HidEngine @Inject constructor(
         val attempt = ++reconnectAttempts
         val backoff = RECONNECT_BASE_DELAY_MS shl (attempt - 1)
         Timber.i("auto-reconnect attempt %d in %dms", attempt, backoff)
+        _reconnectStatus.value = attempt to RECONNECT_MAX_ATTEMPTS   // ADV S5
         scope.launch {
             delay(backoff)
             if (connectedDevice == null && !userInitiatedDisconnect && appRegistered) {
                 connect(target)
+            } else {
+                _reconnectStatus.value = null
             }
         }
     }

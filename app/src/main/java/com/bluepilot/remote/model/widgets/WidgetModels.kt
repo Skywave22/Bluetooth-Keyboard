@@ -159,11 +159,15 @@ data class WidgetSpec(
     val swipeDown: WidgetAction = WidgetAction.None,
     val swipeLeft: WidgetAction = WidgetAction.None,
     val swipeRight: WidgetAction = WidgetAction.None,
-    val twoFingerTap: WidgetAction = WidgetAction.None
+    val twoFingerTap: WidgetAction = WidgetAction.None,
+    /** SECTION 2 — element grouping: same non-blank id = moves as one unit.
+     *  Serialized with a default so every pre-upgrade layout loads fine. */
+    val groupId: String = ""
 ) {
     fun sanitized(): WidgetSpec = copy(
         frame = frame.sanitized(),
-        style = style.sanitized()
+        style = style.sanitized(),
+        groupId = groupId.take(64)
     )
 }
 
@@ -172,17 +176,25 @@ data class LayoutSpec(
     val name: String = "Untitled",
     /** Grid snap size as canvas fraction; 0 disables snapping. */
     val gridSize: Float = 0.025f,
-    val widgets: List<WidgetSpec> = emptyList()
+    val widgets: List<WidgetSpec> = emptyList(),
+    /** SECTION 2 — profile category/folder (e.g. "FPS", "Media", "Work"). */
+    val category: String = "",
+    /** SECTION 2 — free-text description/notes shown in the profile list. */
+    val notes: String = ""
 ) {
     companion object {
         const val MAX_WIDGETS = 60
         const val NAME_MAX = 40
+        const val CATEGORY_MAX = 24
+        const val NOTES_MAX = 200
     }
 
     fun sanitized(): LayoutSpec = copy(
         name = name.take(NAME_MAX).ifBlank { "Untitled" },
         gridSize = if (gridSize.isNaN()) 0f else gridSize.coerceIn(0f, 0.25f),
-        widgets = widgets.take(MAX_WIDGETS).map { it.sanitized() }
+        widgets = widgets.take(MAX_WIDGETS).map { it.sanitized() },
+        category = category.take(CATEGORY_MAX),
+        notes = notes.take(NOTES_MAX)
     )
 }
 

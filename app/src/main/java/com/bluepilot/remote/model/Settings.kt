@@ -30,7 +30,29 @@ data class AppSettings(
     /** 3D quality: FULL / REDUCED / FLAT (Section 9). */
     val quality3D: String = "FULL",
     /** Icon pack style: FILLED / OUTLINED / ROUNDED / SHARP. */
-    val iconPack: String = "ROUNDED"
+    val iconPack: String = "ROUNDED",
+
+    // ----- SECTION 1 (deep theme pass) -----
+    /** Recently applied theme ids, newest first, CSV (max 6). */
+    val recentThemes: String = "",
+    /** Favorite/pinned theme ids, CSV. */
+    val favoriteThemes: String = "",
+    /** Auto theme scheduling: switch by time of day. */
+    val autoThemeEnabled: Boolean = false,
+    /** Theme id used during the day window. */
+    val autoDayTheme: String = "minimal_light",
+    /** Theme id used during the night window. */
+    val autoNightTheme: String = "pilot_dark",
+    /** Night window start hour 0..23 (default 19:00). */
+    val autoNightStart: Int = 19,
+    /** Night window end hour 0..23 (default 07:00). */
+    val autoNightEnd: Int = 7,
+
+    // ----- ADV SECTION 3 (gamepad profile enhancements) -----
+    /** Favorite gamepad profile row-ids, CSV. */
+    val favoriteGamepads: String = "",
+    /** Recently played gamepad profile row-ids, newest first, CSV (max 6). */
+    val recentGamepads: String = ""
 )
 
 /** Mouse/trackpad tuning. All percentages 0..100. */

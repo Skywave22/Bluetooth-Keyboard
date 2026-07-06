@@ -24,11 +24,58 @@ enum class GamepadControlType {
     /** 4- or 8-way directional pad → HID hat switch. */
     DPAD,
     /** Analog stick → left (X/Y) or right (Z/Rz) axis pair. */
-    STICK
+    STICK,
+    /** ADV S1 — single independently-placeable arrow → one hat direction. */
+    ARROW,
+    /** ADV S1 — bumper+trigger double zone: top half & bottom half are two buttons. */
+    COMBO
 }
 
 @Serializable
 enum class ControlShape { CIRCLE, ROUNDED, SQUARE }
+
+// ----------------------------------------------------------------------
+// ADV SECTION 1 — advanced control library enums
+// ----------------------------------------------------------------------
+
+/** Button press semantics. */
+@Serializable
+enum class ButtonMode {
+    /** Press = down, release = up (also the "hold" behavior). */
+    MOMENTARY,
+    /** Tap once = latched ON, tap again = OFF (auto-run, crouch-toggle). */
+    TOGGLE,
+    /** Single tap = primary index, double tap = secondary index. */
+    MULTI_TAP,
+    /** Fires when a finger slides INTO it (piano-key combos across buttons). */
+    SLIDE,
+    /** Long-press opens a radial wheel of up to 8 sub-buttons. */
+    RADIAL
+}
+
+/** One hat direction for ARROW controls (HID hat 0=N..7=NW, 8=neutral). */
+@Serializable
+enum class ArrowDirection(val hat: Int) {
+    UP(0), UP_RIGHT(1), RIGHT(2), DOWN_RIGHT(3),
+    DOWN(4), DOWN_LEFT(5), LEFT(6), UP_LEFT(7)
+}
+
+/** Visual style for ARROW controls. */
+@Serializable
+enum class ArrowStyle { SQUARE, ROUNDED, ARROW, DOT }
+
+/** D-pad rendering/behavior style. */
+@Serializable
+enum class DpadStyle {
+    /** Classic cross: 4- or 8-way segments with a center dead zone. */
+    CROSS,
+    /** Continuous circular zone: always 8-way, small dead zone. */
+    CIRCULAR
+}
+
+/** Analog stick gate (movement boundary) shape. */
+@Serializable
+enum class StickGate { CIRCLE, SQUARE }
 
 @Serializable
 enum class StickSide { LEFT, RIGHT }
@@ -72,11 +119,53 @@ data class GamepadControlSpec(
     /** Haptic pattern played on press. */
     val haptic: HapticPattern = HapticPattern.LIGHT_TAP,
     /** Custom emoji/icon rendered above the label ("" = none). */
-    val icon: String = ""
+    val icon: String = "",
+
+    // ----- ADV SECTION 1 fields (all defaulted → old JSON loads fine) -----
+    /** Button press semantics (BUTTON/TRIGGER). */
+    val buttonMode: ButtonMode = ButtonMode.MOMENTARY,
+    /** MULTI_TAP: second action's HID button index. RADIAL: unused. */
+    val secondaryButtonIndex: Int = 1,
+    /** Double-tap window in ms (MULTI_TAP). */
+    val multiTapWindowMs: Int = 250,
+    /** RADIAL: HID button indices of the wheel options (2..8 entries). */
+    val radialOptions: List<Int> = emptyList(),
+    /** ARROW: which hat direction this arrow sends. */
+    val arrowDirection: ArrowDirection = ArrowDirection.UP,
+    /** ARROW: visual style. */
+    val arrowStyle: ArrowStyle = ArrowStyle.ROUNDED,
+    /** ARROW: hold-to-repeat (else single press). */
+    val arrowRepeat: Boolean = false,
+    /** ARROW: repeat rate in repeats/second (2..30). */
+    val arrowRepeatRate: Int = 10,
+    /** DPAD: cross vs continuous circular zone. */
+    val dpadStyle: DpadStyle = DpadStyle.CROSS,
+    /** DPAD: diagonals-only mode (only NE/SE/SW/NW register). */
+    val diagonalOnly: Boolean = false,
+    /** STICK: gate shape (circle vs square boundary). */
+    val stickGate: StickGate = StickGate.CIRCLE,
+    /** STICK: show 8-direction guide-line overlay. */
+    val stickGuides: Boolean = false,
+    /** STICK: sticky mode — knob stays where released (no auto-center). */
+    val stickSticky: Boolean = false,
+    /** STICK: stick-click (L3/R3) — long-press the knob sends this button; -1 = off. */
+    val stickClickIndex: Int = -1,
+    /** STICK: outer range as fraction of geometric max (0.5..1.0). */
+    val outerRange: Float = 1f,
+    /** STICK: anti-deadzone — output jumps to this % as soon as input leaves center. */
+    val antiDeadZone: Int = 0,
+    /** COMBO: HID index for the second (bottom) zone; top uses buttonIndex. */
+    val comboSecondIndex: Int = 7,
+    /** Visual press-confirmation ripple/glow toggle. */
+    val pressGlow: Boolean = true,
+    /** ADV S2 — layer: 0 = base (always visible), 1 = shift layer
+     *  (visible only while the layout's shift button is held). */
+    val layer: Int = 0
 ) {
     companion object {
         const val LABEL_MAX = 8
         const val BUTTON_INDEX_MAX = 15
+        const val RADIAL_MAX = 8
     }
 
     fun sanitized(): GamepadControlSpec = copy(
@@ -86,7 +175,16 @@ data class GamepadControlSpec(
         buttonIndex = buttonIndex.coerceIn(0, BUTTON_INDEX_MAX),
         deadZone = deadZone.coerceIn(0, 50),
         turboRate = turboRate.coerceIn(2, 20),
-        icon = icon.take(4)
+        icon = icon.take(4),
+        secondaryButtonIndex = secondaryButtonIndex.coerceIn(0, BUTTON_INDEX_MAX),
+        multiTapWindowMs = multiTapWindowMs.coerceIn(120, 600),
+        radialOptions = radialOptions.take(RADIAL_MAX).map { it.coerceIn(0, BUTTON_INDEX_MAX) },
+        arrowRepeatRate = arrowRepeatRate.coerceIn(2, 30),
+        stickClickIndex = stickClickIndex.coerceIn(-1, BUTTON_INDEX_MAX),
+        outerRange = if (outerRange.isNaN()) 1f else outerRange.coerceIn(0.5f, 1f),
+        antiDeadZone = antiDeadZone.coerceIn(0, 40),
+        comboSecondIndex = comboSecondIndex.coerceIn(0, BUTTON_INDEX_MAX),
+        layer = layer.coerceIn(0, 1)
     )
 }
 
@@ -97,7 +195,14 @@ data class GamepadLayoutSpec(
     /** Face-button naming shown in the binding picker (Xbox/PlayStation). */
     val naming: ButtonNaming = ButtonNaming.XBOX,
     /** Stick sensitivity preset percent 0..100 (per-profile, e.g. FPS vs Racing). */
-    val stickSensitivity: Int = 70
+    val stickSensitivity: Int = 70,
+    /** ADV S2 — id of the control that acts as the shift key ("" = no shift layer).
+     *  While held, layer-1 controls show and layer-0 controls dim. */
+    val shiftControlId: String = "",
+    /** ADV S2 — magnetic snap grid size as canvas fraction (0 = off). */
+    val gridSize: Float = 0f,
+    /** ADV S3 — profile tags/categories (FPS, Racing, ...). */
+    val tags: List<String> = emptyList()
 ) {
     companion object {
         const val MAX_CONTROLS = 32
@@ -107,7 +212,9 @@ data class GamepadLayoutSpec(
     fun sanitized(): GamepadLayoutSpec = copy(
         name = name.take(NAME_MAX).ifBlank { "Gamepad" },
         controls = controls.take(MAX_CONTROLS).map { it.sanitized() },
-        stickSensitivity = stickSensitivity.coerceIn(0, 100)
+        stickSensitivity = stickSensitivity.coerceIn(0, 100),
+        gridSize = if (gridSize.isNaN()) 0f else gridSize.coerceIn(0f, 0.25f),
+        tags = tags.filter { it.isNotBlank() }.take(6).map { it.take(16) }
     )
 }
 

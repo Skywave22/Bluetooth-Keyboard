@@ -9,6 +9,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -49,7 +50,26 @@ class MainActivity : ComponentActivity() {
             // forces LIGHT but picked a dark spec (or vice versa), we swap to
             // the closest built-in of the requested brightness.
             val systemDark = isSystemInDarkTheme()
-            val baseSpec = BuiltInThemes.byId(app.themeId)
+            // SECTION 1: auto theme scheduling — when enabled, the hour of
+            // day picks day/night theme; re-evaluated every minute.
+            var clockHour by androidx.compose.runtime.remember {
+                androidx.compose.runtime.mutableStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY))
+            }
+            androidx.compose.runtime.LaunchedEffect(app.autoThemeEnabled) {
+                while (app.autoThemeEnabled) {
+                    clockHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                    kotlinx.coroutines.delay(60_000)
+                }
+            }
+            val scheduledId = com.bluepilot.remote.ui.theme.ThemeScheduler.scheduledThemeId(
+                enabled = app.autoThemeEnabled,
+                hour = clockHour,
+                nightStart = app.autoNightStart,
+                nightEnd = app.autoNightEnd,
+                dayTheme = app.autoDayTheme,
+                nightTheme = app.autoNightTheme
+            )
+            val baseSpec = BuiltInThemes.byId(scheduledId ?: app.themeId)
             val wantDark = when (app.theme) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true

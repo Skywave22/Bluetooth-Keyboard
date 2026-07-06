@@ -56,6 +56,16 @@ class DataStoreSettings @Inject constructor(
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
         val ICON_PACK = stringPreferencesKey("icon_pack")
         val QUALITY_3D = stringPreferencesKey("quality_3d")
+        // Section 1 deep theme pass
+        val RECENT_THEMES = stringPreferencesKey("recent_themes")
+        val FAVORITE_THEMES = stringPreferencesKey("favorite_themes")
+        val AUTO_THEME = booleanPreferencesKey("auto_theme")
+        val AUTO_DAY_THEME = stringPreferencesKey("auto_day_theme")
+        val AUTO_NIGHT_THEME = stringPreferencesKey("auto_night_theme")
+        val AUTO_NIGHT_START = intPreferencesKey("auto_night_start")
+        val AUTO_NIGHT_END = intPreferencesKey("auto_night_end")
+        val FAV_GAMEPADS = stringPreferencesKey("fav_gamepads")
+        val RECENT_GAMEPADS = stringPreferencesKey("recent_gamepads")
         // Mouse
         val M_SENSITIVITY = intPreferencesKey("m_sensitivity")
         val M_SCROLL = intPreferencesKey("m_scroll")
@@ -99,7 +109,16 @@ class DataStoreSettings @Inject constructor(
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             reduceMotion = p[Keys.REDUCE_MOTION] ?: false,
             iconPack = p[Keys.ICON_PACK] ?: "ROUNDED",
-            quality3D = p[Keys.QUALITY_3D] ?: "FULL"
+            quality3D = p[Keys.QUALITY_3D] ?: "FULL",
+            recentThemes = p[Keys.RECENT_THEMES] ?: "",
+            favoriteThemes = p[Keys.FAVORITE_THEMES] ?: "",
+            autoThemeEnabled = p[Keys.AUTO_THEME] ?: false,
+            autoDayTheme = p[Keys.AUTO_DAY_THEME] ?: "minimal_light",
+            autoNightTheme = p[Keys.AUTO_NIGHT_THEME] ?: "pilot_dark",
+            autoNightStart = (p[Keys.AUTO_NIGHT_START] ?: 19).coerceIn(0, 23),
+            autoNightEnd = (p[Keys.AUTO_NIGHT_END] ?: 7).coerceIn(0, 23),
+            favoriteGamepads = p[Keys.FAV_GAMEPADS] ?: "",
+            recentGamepads = p[Keys.RECENT_GAMEPADS] ?: ""
         )
     }
 
@@ -144,6 +163,15 @@ class DataStoreSettings @Inject constructor(
             p[Keys.REDUCE_MOTION] = settings.reduceMotion
             p[Keys.ICON_PACK] = settings.iconPack
             p[Keys.QUALITY_3D] = settings.quality3D
+            p[Keys.RECENT_THEMES] = settings.recentThemes
+            p[Keys.FAVORITE_THEMES] = settings.favoriteThemes
+            p[Keys.AUTO_THEME] = settings.autoThemeEnabled
+            p[Keys.AUTO_DAY_THEME] = settings.autoDayTheme
+            p[Keys.AUTO_NIGHT_THEME] = settings.autoNightTheme
+            p[Keys.AUTO_NIGHT_START] = settings.autoNightStart.coerceIn(0, 23)
+            p[Keys.AUTO_NIGHT_END] = settings.autoNightEnd.coerceIn(0, 23)
+            p[Keys.FAV_GAMEPADS] = settings.favoriteGamepads
+            p[Keys.RECENT_GAMEPADS] = settings.recentGamepads
         }
     }
 
