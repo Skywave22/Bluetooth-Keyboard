@@ -100,7 +100,7 @@ class DataStoreSettings @Inject constructor(
     override val appSettings: Flow<AppSettings> = safePrefs.map { p ->
         AppSettings(
             theme = p[Keys.THEME].toEnum(ThemeMode.SYSTEM),
-            themeId = p[Keys.THEME_ID] ?: "pilot_dark",
+            themeId = p[Keys.THEME_ID] ?: "aero_glass",
             fullscreenMode = p[Keys.FULLSCREEN] ?: false,
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: true,
             touchVibrations = p[Keys.VIBRATIONS] ?: true,

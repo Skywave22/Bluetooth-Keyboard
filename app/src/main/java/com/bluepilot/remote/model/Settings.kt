@@ -17,7 +17,7 @@ enum class HapticIntensity { LIGHT, MEDIUM, STRONG }
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** Active visual theme id from BuiltInThemes (Section 1 theme engine). */
-    val themeId: String = "pilot_dark",
+    val themeId: String = "aero_glass",
     val fullscreenMode: Boolean = false,
     val keepScreenOn: Boolean = true,
     val touchVibrations: Boolean = true,

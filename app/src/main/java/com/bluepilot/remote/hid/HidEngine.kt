@@ -50,9 +50,9 @@ class HidEngine @Inject constructor(
 ) : com.bluepilot.remote.domain.HidController {
 
     private companion object {
-        const val SDP_NAME = "BluePilot Remote"
+        const val SDP_NAME = "AeroPad"
         const val SDP_DESCRIPTION = "Keyboard, mouse, media and gamepad remote"
-        const val SDP_PROVIDER = "BluePilot"
+        const val SDP_PROVIDER = "AeroPad"
         /** HID subclass: 0xC0 = combo keyboard+pointing device. */
         const val SUBCLASS_COMBO: Byte = 0xC0.toByte()
         const val KEY_TAP_DELAY_MS = 8L
