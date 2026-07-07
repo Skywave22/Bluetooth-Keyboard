@@ -128,12 +128,12 @@ fun HomeScreen(
                 ) {
                     Column {
                         Text(
-                            text = if (spec.monoFont) "BLUEPILOT REMOTE" else "BluePilot Remote",
+                            text = if (spec.monoFont) "AEROPAD" else "AeroPad",
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = if (spec.monoFont) "BLUETOOTH HID CONTROLLER" else "Bluetooth HID controller",
+                            text = if (spec.monoFont) "WIRELESS KEYBOARD, MOUSE & GAMEPAD" else "Wireless keyboard, mouse & gamepad",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

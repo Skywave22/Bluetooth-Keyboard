@@ -104,6 +104,7 @@ fun ThemeGalleryScreen(
     ) { padding ->
         // Gallery grouped by design family (one section per mockup set).
         val allFamilies: List<Pair<String, List<AppThemeSpec>>> = listOf(
+            "AeroPad" to listOf(BuiltInThemes.AERO_GLASS),
             "Classic" to listOf(BuiltInThemes.PILOT_DARK, BuiltInThemes.PILOT_GLOW),
             "Liquid Glass" to listOf(BuiltInThemes.LIQUID_GLASS, BuiltInThemes.LIQUID_GLASS_LIGHT),
             "Glass × Material You" to listOf(BuiltInThemes.GLASS_YOU_DARK, BuiltInThemes.GLASS_YOU_LIGHT),

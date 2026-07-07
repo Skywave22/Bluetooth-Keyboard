@@ -126,12 +126,14 @@ fun MouseScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+                        // STITCH REDESIGN — ghosted watermark caption.
                         Text(
-                            text = if (spec.monoFont) "TRACKPAD\nTAP = CLICK • HOLD = RIGHT CLICK"
-                            else "Trackpad\ntap = click • hold = right click",
-                            style = if (spec.monoFont) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-                            else MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = "TRACKPAD AREA",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                letterSpacing = androidx.compose.ui.unit.TextUnit(
+                                    3f, androidx.compose.ui.unit.TextUnitType.Sp)
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
@@ -175,13 +177,14 @@ fun MouseScreen(
                     .height(56.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                KeyCard("Left", modifier = Modifier.weight(2f), height = 56.dp) {
+                // STITCH REDESIGN — LEFT CLICK is the accent (primary) button.
+                KeyCard("LEFT CLICK", modifier = Modifier.weight(2f), height = 56.dp, emphasized = true) {
                     haptic(); viewModel.clickButton(MouseButton.LEFT)
                 }
-                KeyCard("Middle", modifier = Modifier.weight(1f), height = 56.dp) {
+                KeyCard("MID", modifier = Modifier.weight(1f), height = 56.dp) {
                     haptic(); viewModel.clickButton(MouseButton.MIDDLE)
                 }
-                KeyCard("Right", modifier = Modifier.weight(2f), height = 56.dp) {
+                KeyCard("RIGHT CLICK", modifier = Modifier.weight(2f), height = 56.dp) {
                     haptic(); viewModel.clickButton(MouseButton.RIGHT)
                 }
             }

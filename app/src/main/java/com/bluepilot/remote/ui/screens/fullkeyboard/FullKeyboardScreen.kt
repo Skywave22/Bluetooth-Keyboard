@@ -177,6 +177,49 @@ fun FullKeyboardScreen(
                     }
                 }
             }
+            Spacer(Modifier.height(10.dp))
+
+            // STITCH REDESIGN — live status strip (REAL measured values).
+            run {
+                val healthVm: com.bluepilot.remote.viewmodel.ConnectionHealthViewModel =
+                    androidx.hilt.navigation.compose.hiltViewModel()
+                val snap by healthVm.snapshot.collectAsState()
+                val battery by healthVm.battery.collectAsState()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    com.bluepilot.remote.ui.components.GlassCard(modifier = Modifier.weight(1f)) {
+                        Column(Modifier.padding(10.dp)) {
+                            Text("LATENCY", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                if (snap.totalSent > 0) "${snap.recentMeanSendUs}µs" else "—",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    com.bluepilot.remote.ui.components.GlassCard(modifier = Modifier.weight(1f)) {
+                        Column(Modifier.padding(10.dp)) {
+                            Text("REPORTS", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${snap.reportsPerSecond}/s",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    com.bluepilot.remote.ui.components.GlassCard(modifier = Modifier.weight(1f)) {
+                        Column(Modifier.padding(10.dp)) {
+                            Text("BATTERY", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${battery.first}%",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
         }
     }

@@ -9,6 +9,28 @@ import androidx.compose.ui.graphics.Color
 object BuiltInThemes {
 
     /** Classic BluePilot look (the pre-update default). */
+    /** STITCH REDESIGN — "AeroPad Liquid Glass": the new default look.
+     *  Deep navy ink #0B1220, teal/cyan accent, frosted glass surfaces,
+     *  soft teal+purple orbs — matches the generated design system. */
+    val AERO_GLASS = AppThemeSpec(
+        id = "aero_glass",
+        name = "Aero Glass",
+        isDark = true,
+        primary = Color(0xFF22D3EE), onPrimary = Color(0xFF06222B),
+        secondary = Color(0xFF7C6CF5),
+        background = Color(0xFF0B1220), onBackground = Color(0xFFE8F1F8),
+        surface = Color(0xFF131C2E), onSurface = Color(0xFFE8F1F8),
+        surfaceVariant = Color(0xFF1B2740), onSurfaceVariant = Color(0xFFA6B6CE),
+        outline = Color(0xFF2E4060),
+        backgroundOrbs = listOf(
+            ThemeOrb(Color(0xFF22D3EE), 0.85f, 0.10f, 0.38f, 0.16f),
+            ThemeOrb(Color(0xFF7C6CF5), 0.12f, 0.80f, 0.42f, 0.18f),
+            ThemeOrb(Color(0xFF16A085), 0.75f, 0.90f, 0.30f, 0.12f)
+        ),
+        cornerRadius = 22, surfaceAlpha = 0.72f, edgeGlow = true, elevation = 0,
+        glowColor = Color(0xFF22D3EE)
+    )
+
     val PILOT_DARK = AppThemeSpec(
         id = "pilot_dark",
         name = "Pilot Dark",
@@ -332,6 +354,7 @@ object BuiltInThemes {
 
     /** All themes, gallery order. */
     val ALL: List<AppThemeSpec> = listOf(
+        AERO_GLASS,
         PILOT_DARK, PILOT_GLOW,
         LIQUID_GLASS, LIQUID_GLASS_LIGHT,
         GLASS_YOU_DARK, GLASS_YOU_LIGHT,
@@ -352,6 +375,7 @@ object BuiltInThemes {
      * Glass, Cockpit HUD <-> Day Flight, ...).
      */
     fun counterpart(spec: AppThemeSpec): AppThemeSpec = when (spec.id) {
+        "aero_glass" -> MINIMAL_LIGHT
         "pilot_dark", "pilot_glow", "oled_black", "dark_neon" -> MINIMAL_LIGHT
         "liquid_glass" -> LIQUID_GLASS_LIGHT
         "liquid_glass_light" -> LIQUID_GLASS
